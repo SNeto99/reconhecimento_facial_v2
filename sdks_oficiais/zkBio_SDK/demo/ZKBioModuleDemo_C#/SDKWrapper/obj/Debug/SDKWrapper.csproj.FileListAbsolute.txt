@@ -1,0 +1,6 @@
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\bin\Debug\SDKWrapper.dll
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\bin\Debug\SDKWrapper.pdb
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Debug\SDKWrapper.csproj.AssemblyReference.cache
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Debug\SDKWrapper.csproj.CoreCompileInputs.cache
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Debug\SDKWrapper.dll
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Debug\SDKWrapper.pdb

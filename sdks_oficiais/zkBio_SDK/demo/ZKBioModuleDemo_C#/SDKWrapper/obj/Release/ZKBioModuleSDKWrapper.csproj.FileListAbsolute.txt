@@ -1,0 +1,5 @@
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\bin\Release\ZKBioModuleSDKWrapper.dll
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\bin\Release\ZKBioModuleSDKWrapper.pdb
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Release\ZKBioModuleSDKWrapper.csproj.CoreCompileInputs.cache
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Release\ZKBioModuleSDKWrapper.dll
+E:\ZKCode\vccode\ZKBioModuleDemo\SDKWrapper\obj\Release\ZKBioModuleSDKWrapper.pdb

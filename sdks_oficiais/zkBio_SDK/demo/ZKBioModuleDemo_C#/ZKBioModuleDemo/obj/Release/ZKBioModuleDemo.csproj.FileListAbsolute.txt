@@ -1,0 +1,13 @@
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\bin\Release\ZKBioModuleDemo.exe
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\bin\Release\ZKBioModuleDemo.pdb
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\bin\Release\ZKBioModuleSDKWrapper.dll
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\bin\Release\ZKBioModuleSDKWrapper.pdb
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.csproj.AssemblyReference.cache
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.DeviceManage.resources
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.Form1.resources
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.Properties.Resources.resources
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.csproj.GenerateResource.cache
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.csproj.CoreCompileInputs.cache
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.csproj.CopyComplete
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.exe
+E:\ZKCode\vccode\ZKBioModuleDemo\ZKBioModuleDemo\obj\Release\ZKBioModuleDemo.pdb

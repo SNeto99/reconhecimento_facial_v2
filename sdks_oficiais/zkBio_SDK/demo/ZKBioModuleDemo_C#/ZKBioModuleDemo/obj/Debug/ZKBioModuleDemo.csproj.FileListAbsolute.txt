@@ -1,0 +1,15 @@
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\bin\Debug\ZKBioModuleDemo.exe
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\bin\Debug\ZKBioModuleDemo.pdb
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\bin\Debug\Newtonsoft.Json.dll
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\bin\Debug\ZKBioModuleSDKWrapper.dll
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\bin\Debug\Newtonsoft.Json.xml
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\bin\Debug\ZKBioModuleSDKWrapper.pdb
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.csproj.AssemblyReference.cache
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.DeviceManage.resources
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.Form1.resources
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.Properties.Resources.resources
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.csproj.GenerateResource.cache
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.csproj.CoreCompileInputs.cache
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioMod.3E15ECBD.Up2Date
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.exe
+C:\Users\DemandaNet\Desktop\reconhecimento facial\zkBio_SDK\demo\ZKBioModuleDemo_C#\ZKBioModuleDemo\obj\Debug\ZKBioModuleDemo.pdb
