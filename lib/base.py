@@ -1742,3 +1742,9 @@ class ZK(object):
             'status': cmd_response.get('status'),
             'message': cmd_response.get('message', '')
         }
+
+    def send_command_raw(self, command, command_string=b'', response_size=8):
+        """
+        Método público para enviar comandos raw para o dispositivo
+        """
+        return self._ZK__send_command(command, command_string, response_size)

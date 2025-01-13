@@ -2,9 +2,9 @@ from ctypes import *
 import os
 import json
 import struct
-from lib.const import *
-from lib.base import ZK
 import time
+from . import const  # Importa o módulo const do mesmo diretório
+from .base import ZK
 from .zk_protocol import ZKProtocol
 
 class ZKSDK:
@@ -213,4 +213,68 @@ class ZKSDK:
                 
         except Exception as e:
             print(f"[FACE-SDK] Erro ao obter versão do firmware: {str(e)}")
-            return None 
+            return None
+            
+    def upload_face_photo(self, user_id, photo_data):
+        """
+        Faz upload de uma foto para um usuário
+        :param user_id: ID do usuário
+        :param photo_data: Bytes da imagem JPEG
+        """
+        try:
+            if not self.zk:
+                raise Exception("Dispositivo não conectado")
+                
+            # Obtém a conexão
+            conn = self.zk.connect()
+            if not conn:
+                raise Exception("Falha ao conectar ao dispositivo")
+                
+            try:
+                # Desabilita o dispositivo
+                conn.disable_device()
+                time.sleep(0.5)
+                
+                # Prepara os dados para envio
+                command_data = struct.pack('<IIII', 
+                    0x0B,               # Comando de face (CMD_FACE_FUNCTION)
+                    int(user_id),       # ID do usuário
+                    len(photo_data),    # Tamanho da foto
+                    0x02                # Operação: upload de foto
+                )
+                
+                # Envia o comando inicial
+                response = conn.send_command_raw(500, command_data)  # CMD_REG_EVENT = 500
+                if not response:
+                    raise Exception("Falha ao iniciar upload")
+                    
+                # Envia os dados da foto em chunks
+                chunk_size = 1024
+                total_sent = 0
+                while total_sent < len(photo_data):
+                    chunk = photo_data[total_sent:total_sent + chunk_size]
+                    chunk_data = struct.pack('<I', len(chunk)) + chunk
+                    response = conn.send_command_raw(1501, chunk_data)  # CMD_DATA = 1501
+                    if not response:
+                        raise Exception("Falha ao enviar chunk")
+                    total_sent += len(chunk)
+                    print(f"[FACE-SDK] Enviados {total_sent} de {len(photo_data)} bytes")
+                    
+                # Finaliza o upload
+                finish_data = struct.pack('<II', int(user_id), 0x01)  # 0x01 = finalizar upload
+                response = conn.send_command_raw(500, finish_data)  # CMD_REG_EVENT = 500
+                if not response:
+                    raise Exception("Falha ao finalizar upload")
+                    
+                print("[FACE-SDK] Upload de foto concluído com sucesso")
+                return True
+                
+            finally:
+                # Reabilita o dispositivo
+                conn.enable_device()
+                time.sleep(0.5)
+                conn.disconnect()
+                
+        except Exception as e:
+            print(f"[FACE-SDK] Erro ao fazer upload da foto: {str(e)}")
+            return False 
