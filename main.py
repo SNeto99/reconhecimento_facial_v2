@@ -41,7 +41,8 @@ def setup_environment():
 def main():
     try:
         setup_environment()
-        app = MainWindow()
+        from ui.connection_form import ConnectionForm
+        app = ConnectionForm()
         app.mainloop()
     except Exception as e:
         print(f"Erro ao iniciar a aplicação: {str(e)}")

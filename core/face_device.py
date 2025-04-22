@@ -3,7 +3,6 @@ from ctypes import *
 from zk import ZK, const
 from lib.base import ZK
 from lib.const import *
-from .face_capture import FaceCapture
 
 class FaceDevice:
     def __init__(self, ip, port=4370):
@@ -33,9 +32,6 @@ class FaceDevice:
             # Removemos a parte de inicialização do SDK USB já que vamos usar rede
             self._log("Inicialização concluída")
             
-            # Inicializa o módulo de captura facial
-            self.face_capture = FaceCapture(self)
-                
         except Exception as e:
             self._log(f"Erro durante inicialização: {str(e)}")
             raise
@@ -78,53 +74,10 @@ class FaceDevice:
                 self.conn.disconnect()
                 self._log("Desconectado da rede")
                 
-            if self.face_capture:
-                self._log("Parando captura facial...")
-                self.face_capture.cancel_enrollment()
-                
             return True
             
         except Exception as e:
             self._log(f"Erro durante a desconexão: {str(e)}")
-            return False
-            
-    def start_face_capture(self, user_id, video_callback=None, face_callback=None):
-        """Inicia a captura da face para um usuário específico"""
-        try:
-            if not self.face_capture:
-                raise Exception("Módulo de captura facial não inicializado")
-                
-            self._log(f"Iniciando captura facial para usuário {user_id}")
-            
-            # Inicia o processo de cadastro
-            if not self.face_capture.start_enrollment(user_id):
-                raise Exception("Falha ao iniciar processo de cadastro facial")
-                
-            return True
-            
-        except Exception as e:
-            self._log(f"Erro ao iniciar captura facial: {str(e)}")
-            return False
-            
-    def finish_face_capture(self):
-        """Finaliza o processo de captura facial"""
-        try:
-            if not self.face_capture:
-                raise Exception("Módulo de captura facial não inicializado")
-                
-            self._log("Finalizando captura facial...")
-            
-            # Para a captura
-            self.face_capture.stop_capture()
-            
-            # Finaliza o processo de cadastro
-            if not self.face_capture.finish_enrollment():
-                raise Exception("Falha ao finalizar processo de cadastro facial")
-                
-            return True
-            
-        except Exception as e:
-            self._log(f"Erro ao finalizar captura facial: {str(e)}")
             return False
             
     def get_users(self):

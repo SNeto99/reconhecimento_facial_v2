@@ -6,7 +6,7 @@ from core.face_device import FaceDevice
 import time
 
 class MainWindow(tk.Tk):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, device=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.title("Interface do Dispositivo ZKTeco")
         
@@ -14,7 +14,7 @@ class MainWindow(tk.Tk):
         self.geometry("800x726")
         
         # Inicializa o dispositivo
-        self.device = None
+        self.device = device
         
         # Notebook para as abas (agora direto na janela principal)
         self.notebook = ttk.Notebook(self)
@@ -388,42 +388,6 @@ class MainWindow(tk.Tk):
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar lista de logs: {str(e)}")
         
-    def iniciar_cadastro_facial(self, user_id):
-        """
-        Inicia o processo de cadastro facial para um usuário
-        """
-        try:
-            # Desativa o dispositivo temporariamente
-            self.face_device.disable_device()
-            
-            # Inicia o processo de cadastro
-            if self.face_device.face_capture.start_enrollment(user_id):
-                self.show_message(
-                    "Cadastro Facial",
-                    "Por favor, posicione seu rosto na frente do dispositivo.\n"
-                    "Mantenha o rosto centralizado e aguarde a captura."
-                )
-                
-                # Loop para verificar o status do cadastro
-                attempts = 0
-                while attempts < 30:  # 30 segundos de timeout
-                    if self.face_device.face_capture.check_enrollment_status():
-                        self.show_message("Sucesso", "Cadastro facial realizado com sucesso!")
-                        return True
-                    time.sleep(1)
-                    attempts += 1
-                    
-                self.show_error("Erro", "Tempo excedido para cadastro facial")
-                return False
-                
-        except Exception as e:
-            self.show_error("Erro", f"Falha no cadastro facial: {str(e)}")
-            return False
-            
-        finally:
-            # Reativa o dispositivo
-            self.face_device.enable_device()
-
     def on_mouse_move(self, event):
         """Altera o cursor quando passa sobre os botões de ação"""
         region = self.user_list.identify_region(event.x, event.y)
