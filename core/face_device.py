@@ -21,7 +21,8 @@ class FaceDevice:
         """Função interna para logging"""
         if self.debug_callback:
             self.debug_callback(message)
-        print(message)
+        else:
+            print(message)
         
     def _initialize_sdk(self):
         """Inicializa as DLLs do SDK"""

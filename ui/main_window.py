@@ -4,6 +4,7 @@ from tkinter import ttk, messagebox, scrolledtext
 from .user_form import UserForm
 from core.face_device import FaceDevice
 import time
+from ui.settings_tab import SettingsTab
 
 class MainWindow(tk.Tk):
     def __init__(self, device=None, *args, **kwargs):
@@ -15,6 +16,8 @@ class MainWindow(tk.Tk):
         
         # Inicializa o dispositivo
         self.device = device
+        if not self.device:
+            self.title(self.title() + " (Desconectado)")
         
         # Notebook para as abas (agora direto na janela principal)
         self.notebook = ttk.Notebook(self)
@@ -29,52 +32,27 @@ class MainWindow(tk.Tk):
         self.log_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.log_tab, text="Logs")
         
+        self.settings_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.settings_tab, text="Configurações")
+        
         self.create_device_tab()
         self.create_user_tab()
         self.create_log_tab()
         
-        # Desabilita as abas até que haja conexão
-        self.notebook.state(['disabled'])
+        if self.device:
+            self.refresh_device_info()
+            self.refresh_user_list()
+            self.refresh_log_list()
+        else:
+            self.load_local_users()
+            self.load_local_logs()
+
+        settings_widget = SettingsTab(self.settings_tab)
+        settings_widget.pack(fill="both", expand=True)
         
     def create_device_tab(self):
         frame = ttk.Frame(self.device_tab, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Frame de conexão
-        self.connection_frame = ttk.LabelFrame(frame, text="Conexão", padding="5")
-        self.connection_frame.pack(fill=tk.X, pady=5)
-        
-        # Campos de conexão
-        self.ip_label = ttk.Label(self.connection_frame, text="IP do Dispositivo:")
-        self.ip_label.pack(side=tk.LEFT, padx=5)
-        self.ip_entry = ttk.Entry(self.connection_frame)
-        self.ip_entry.pack(side=tk.LEFT, padx=5)
-        self.ip_entry.insert(0, "192.168.50.201")  # IP padrão
-        
-        # Porta
-        self.port_label = ttk.Label(self.connection_frame, text="Porta:")
-        self.port_label.pack(side=tk.LEFT, padx=5)
-        self.port_entry = ttk.Entry(self.connection_frame, width=6)
-        self.port_entry.pack(side=tk.LEFT, padx=5)
-        self.port_entry.insert(0, "4370")  # Porta padrão
-        
-        self.connect_button = ttk.Button(self.connection_frame, text="Conectar", command=self.connect_device)
-        self.connect_button.pack(side=tk.LEFT, padx=5)
-        
-        self.status_label = ttk.Label(self.connection_frame, text="Desconectado")
-        self.status_label.pack(side=tk.LEFT, padx=5)
-        
-        # Área de log
-        self.log_frame = ttk.LabelFrame(frame, text="Log de Conexão", padding="5")
-        self.log_frame.pack(fill=tk.X, pady=5)
-        
-        # Usando ScrolledText para ter barra de rolagem
-        self.log_text = scrolledtext.ScrolledText(self.log_frame, height=8, width=70)
-        self.log_text.pack(padx=5, pady=5, fill=tk.BOTH, expand=True)
-        
-        # Botão para limpar logs
-        self.clear_log_button = ttk.Button(self.log_frame, text="Limpar Logs", command=self.clear_logs)
-        self.clear_log_button.pack(pady=5)
         
         # Frame para informações do dispositivo
         info_label = ttk.Label(frame, text="Informações do Dispositivo", font=('Helvetica', 12, 'bold'))
@@ -99,9 +77,7 @@ class MainWindow(tk.Tk):
         ]
         
         for i, (key, text) in enumerate(info_fields):
-            # Label do campo
             ttk.Label(info_frame, text=text).grid(row=i, column=0, sticky='e', padx=5, pady=3)
-            # Label do valor
             value_label = ttk.Label(info_frame, text="---")
             value_label.grid(row=i, column=1, sticky='w', padx=5, pady=3)
             self.info_labels[key] = value_label
@@ -112,8 +88,11 @@ class MainWindow(tk.Tk):
         
     def add_log(self, message):
         """Adiciona uma mensagem à área de log"""
-        self.log_text.insert(tk.END, f"{message}\n")
-        self.log_text.see(tk.END)
+        if hasattr(self, 'log_text') and self.log_text:
+            self.log_text.insert(tk.END, f"{message}\n")
+            self.log_text.see(tk.END)
+        else:
+            print(message)
         
     def clear_logs(self):
         """Limpa os logs do dispositivo"""
@@ -201,6 +180,9 @@ class MainWindow(tk.Tk):
                 self.info_labels["faces"].config(text=str(info.get("faces", "---")))
                 self.info_labels["records"].config(text=str(info.get("records", "---")))
                 self.info_labels["device_name"].config(text=info.get("device_name", "---"))
+                from database import save_device_info
+                device_id = save_device_info(info)
+                self.add_log(f"Dispositivo salvo com id: {device_id}")
                 
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao obter informações do dispositivo: {str(e)}")
@@ -215,8 +197,10 @@ class MainWindow(tk.Tk):
         self.add_user_button = ttk.Button(button_frame, text="Adicionar Usuário", command=self.open_user_form)
         self.add_user_button.pack(side=tk.LEFT, padx=5)
         
-        refresh_button = ttk.Button(button_frame, text="Atualizar Lista", command=self.refresh_user_list)
-        refresh_button.pack(side=tk.LEFT, padx=5)
+        self.user_refresh_button = ttk.Button(button_frame, text="Atualizar Lista", command=self.refresh_user_list)
+        self.user_refresh_button.pack(side=tk.LEFT, padx=5)
+        if not self.device:
+            self.user_refresh_button.config(state="disabled")
         
         # Lista de usuários
         list_frame = ttk.LabelFrame(frame, text="Usuários Cadastrados", padding="5")
@@ -309,11 +293,15 @@ class MainWindow(tk.Tk):
         button_frame = ttk.Frame(frame)
         button_frame.pack(fill=tk.X, pady=5)
         
-        refresh_button = ttk.Button(button_frame, text="Atualizar Logs", command=self.refresh_log_list)
-        refresh_button.pack(side=tk.LEFT, padx=5)
+        self.log_refresh_button = ttk.Button(button_frame, text="Atualizar Logs", command=self.refresh_log_list)
+        self.log_refresh_button.pack(side=tk.LEFT, padx=5)
         
-        clear_button = ttk.Button(button_frame, text="Limpar Logs", command=self.clear_logs)
-        clear_button.pack(side=tk.LEFT, padx=5)
+        self.clear_log_button = ttk.Button(button_frame, text="Limpar Logs", command=self.clear_logs)
+        self.clear_log_button.pack(side=tk.LEFT, padx=5)
+        
+        # Rótulo para exibir a contagem de logs
+        self.log_count_label = ttk.Label(frame, text="Total de logs: 0")
+        self.log_count_label.pack(fill=tk.X, padx=10, pady=5)
         
         # Lista de logs
         list_frame = ttk.LabelFrame(frame, text="Registros de Acesso", padding="5")
@@ -324,7 +312,7 @@ class MainWindow(tk.Tk):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         self.log_list = ttk.Treeview(list_frame, columns=("Data", "Usuário", "Evento"), show="headings",
-                                    yscrollcommand=scrollbar.set)
+                                     yscrollcommand=scrollbar.set)
         self.log_list.heading("Data", text="Data/Hora")
         self.log_list.heading("Usuário", text="Usuário")
         self.log_list.heading("Evento", text="Evento")
@@ -340,51 +328,55 @@ class MainWindow(tk.Tk):
         UserForm(self, self.device)
         
     def refresh_user_list(self):
-        """Atualiza a lista de usuários"""
+        """Atualiza a lista de usuários a partir do dispositivo, se conectado"""
         if not self.device:
+            messagebox.showinfo("Atenção", "Por favor, conecte-se com o dispositivo para atualizar a lista de usuários.")
             return
-            
         try:
-            # Limpa a lista atual
+            from database import init_db, synchronize_users, add_device
+            init_db()
+            device_info = self.device.get_device_info()
+            current_device_id = add_device(device_info.get("mac"))
+            device_users = self.device.get_users()
+            local_users = synchronize_users(device_users, current_device_id)
+            local_users = sorted(local_users, key=lambda u: u[0], reverse=True)
             for item in self.user_list.get_children():
                 self.user_list.delete(item)
-                
-            # Obtém a lista de usuários
-            users = self.device.get_users()
-            
-            # Adiciona os usuários à lista
-            for user in users:
-                # Insere o item com as tags apropriadas para cada coluna
-                self.user_list.insert("", "end", values=(
-                    user['user_id'],
-                    user['name'],
-                    "̲E̲d̲i̲t̲a̲r̲",  # Usando o caractere combinante U+0332 de forma contínua
-                    "̲E̲x̲c̲l̲u̲i̲r̲"   # Usando o caractere combinante U+0332 de forma contínua
-                ))
-                
+            for u in local_users:
+                # u: [id, device_user_id, system_id, name, synced]
+                self.user_list.insert("", "end", values=(u[1], u[3], "̲E̲d̲i̲t̲a̲r̲", "̲E̲x̲c̲l̲u̲i̲r̲"))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar lista de usuários: {str(e)}")
             
     def refresh_log_list(self):
-        """Atualiza a lista de logs"""
+        """Atualiza a lista de logs a partir do dispositivo, se conectado"""
         if not self.device:
-            messagebox.showerror("Erro", "Por favor, conecte-se ao dispositivo primeiro.")
+            messagebox.showinfo("Atenção", "Por favor, conecte-se com o dispositivo para atualizar os logs.")
             return
-            
         try:
-            # Limpa a lista atual
             for item in self.log_list.get_children():
                 self.log_list.delete(item)
-                
-            # Obtém e exibe os logs
-            logs = self.device.get_attendance_logs()
+            from database import get_all_users, synchronize_logs, add_device
+            local_users = get_all_users()
+            user_mapping = {u[1]: u[3] for u in local_users}
+            event_map = {15: "validação facial"}
+            device_info = self.device.get_device_info()
+            current_device_id = add_device(device_info.get("mac"))
+            device_logs = self.device.get_attendance_logs()
+            # Insere o current_device_id em cada log para associá-los ao dispositivo
+            for log in device_logs:
+                log['device_id'] = current_device_id
+            logs = synchronize_logs(device_logs)
+            from datetime import datetime
             for log in logs:
-                self.log_list.insert('', 'end', values=(
-                    log['timestamp'].strftime('%d/%m/%Y %H:%M:%S'),
-                    log['user_id'],
-                    log['status']
-                ))
-                
+                if not isinstance(log['timestamp'], datetime):
+                    log['timestamp'] = datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S")
+            logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
+            self.log_count_label.config(text=f"Total de logs: {len(logs_sorted)}")
+            for log in logs_sorted:
+                student_name = user_mapping.get(log['user_id'], log['user_id'])
+                event_name = event_map.get(log['status'], log['status'])
+                self.log_list.insert('', 'end', values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'), student_name, event_name))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar lista de logs: {str(e)}")
         
@@ -397,3 +389,49 @@ class MainWindow(tk.Tk):
             self.user_list.config(cursor="hand2")
         else:
             self.user_list.config(cursor="")
+
+    def disable_device_controls(self):
+        """Desabilita os botões que interagem diretamente com o dispositivo."""
+        try:
+            if hasattr(self, 'add_user_button'):
+                self.add_user_button.config(state='disabled')
+            if hasattr(self, 'log_refresh_button'):
+                self.log_refresh_button.config(state='disabled')
+            if hasattr(self, 'clear_log_button'):
+                self.clear_log_button.config(state='disabled')
+        except Exception as e:
+            print("Erro ao desabilitar os controles do dispositivo:", e)
+
+    def load_local_users(self):
+        """Carrega usuários do banco de dados local e atualiza a lista"""
+        try:
+            from database import get_all_users
+            local_users = get_all_users()
+            local_users = sorted(local_users, key=lambda u: u[0], reverse=True)
+            for item in self.user_list.get_children():
+                self.user_list.delete(item)
+            for u in local_users:
+                self.user_list.insert("", "end", values=(u[1], u[3], "̲E̲d̲i̲t̲a̲r̲", "̲E̲x̲c̲l̲u̲i̲r̲"))
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao carregar usuários locais: {str(e)}")
+
+    def load_local_logs(self):
+        """Carrega logs do banco de dados local e atualiza a lista"""
+        try:
+            from database import get_all_logs, get_all_users
+            local_users = get_all_users()
+            user_mapping = {u[1]: u[3] for u in local_users}
+            event_map = {15: "validação facial"}
+            logs = get_all_logs()
+            from datetime import datetime
+            for log in logs:
+                if not isinstance(log['timestamp'], datetime):
+                    log['timestamp'] = datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S")
+            logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
+            self.log_count_label.config(text=f"Total de logs: {len(logs_sorted)}")
+            for log in logs_sorted:
+                student_name = user_mapping.get(log['user_id'], log['user_id'])
+                event_name = event_map.get(log['status'], log['status'])
+                self.log_list.insert('', 'end', values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'), student_name, event_name))
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao carregar logs locais: {str(e)}")

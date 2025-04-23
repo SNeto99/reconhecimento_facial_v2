@@ -32,11 +32,6 @@ class UserForm(tk.Toplevel):
         self.nome_entry = ttk.Entry(main_frame)
         self.nome_entry.pack(pady=5)
         
-        self.senha_label = ttk.Label(main_frame, text="Senha:")
-        self.senha_label.pack(pady=5)
-        self.senha_entry = ttk.Entry(main_frame, show="*")
-        self.senha_entry.pack(pady=5)
-        
         # Frame para os botões
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(pady=20)
@@ -46,8 +41,6 @@ class UserForm(tk.Toplevel):
             self.id_entry.insert(0, self.user['user_id'])
             self.id_entry.config(state='disabled')  # ID não pode ser alterado
             self.nome_entry.insert(0, self.user['name'])
-            if 'password' in self.user:
-                self.senha_entry.insert(0, self.user['password'])
             
             self.cadastrar_button = ttk.Button(button_frame, text="Salvar Alterações", command=self.salvar_usuario)
             self.cadastrar_button.pack(side=tk.LEFT, padx=5)
@@ -62,7 +55,6 @@ class UserForm(tk.Toplevel):
         try:
             id_aluno = self.id_entry.get()
             nome = self.nome_entry.get()
-            senha = self.senha_entry.get()
             
             if not id_aluno or not nome:
                 messagebox.showerror("Erro", "Por favor, preencha ID e Nome do aluno.")
@@ -87,7 +79,7 @@ class UserForm(tk.Toplevel):
                 self.device.conn.set_user(
                     uid=id_aluno, 
                     name=nome, 
-                    password=senha if senha else '',  # Envia string vazia se não tiver senha
+                    password='',  # Envia string vazia se não tiver senha
                     user_id=str(id_aluno),  # Garante que user_id seja string
                     privilege=0,  # Usuário comum
                     group_id='0',  # Grupo padrão
@@ -97,15 +89,11 @@ class UserForm(tk.Toplevel):
                 self.aluno_id = id_aluno
                 self.cadastro_realizado = True
                 
-                messagebox.showinfo(
-                    "Sucesso", 
-                    "Usuário cadastrado com sucesso!\nDeseja iniciar a captura facial agora?"
-                )
+                messagebox.showinfo("Sucesso", "Usuário cadastrado com sucesso!")
                 
                 # Desabilita campos
                 self.id_entry.config(state='disabled')
                 self.nome_entry.config(state='disabled')
-                self.senha_entry.config(state='disabled')
                 self.cadastrar_button.config(state='disabled')
                 
             finally:
@@ -120,7 +108,6 @@ class UserForm(tk.Toplevel):
         """Salva as alterações do usuário"""
         try:
             nome = self.nome_entry.get()
-            senha = self.senha_entry.get()
             
             if not nome:
                 messagebox.showerror("Erro", "Por favor, preencha o Nome do aluno.")
@@ -139,7 +126,7 @@ class UserForm(tk.Toplevel):
                 self.device.conn.set_user(
                     uid=int(self.user['user_id']), 
                     name=nome, 
-                    password=senha if senha else '',  # Envia string vazia se não tiver senha
+                    password='',  # Envia string vazia se não tiver senha
                     user_id=str(self.user['user_id']),  # Garante que user_id seja string
                     privilege=0,  # Usuário comum
                     group_id='0',  # Grupo padrão
@@ -150,7 +137,6 @@ class UserForm(tk.Toplevel):
                 
                 # Desabilita os campos e o botão de salvar após a atualização
                 self.nome_entry.config(state='disabled')
-                self.senha_entry.config(state='disabled')
                 self.cadastrar_button.config(state='disabled')
                 
                 self.parent.refresh_user_list()  # Atualiza a lista

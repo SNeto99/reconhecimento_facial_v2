@@ -1,0 +1,16 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Guia da Estrutura do Projeto de Reconhecimento Facial
+
+Este projeto integra um dispositivo ZKTeco SpeedFace V4L com uma interface gráfica baseada em Tkinter. As principais funcionalidades incluem:
+
+- Gerenciamento da janela principal e abas para dispositivos, usuários, logs e configurações: veja o arquivo [ui/main_window.py](mdc:ui/main_window.py).
+- Conexão com o dispositivo e gerenciamento de erros, incluindo carregamento de logs e interface de conexão: veja o arquivo [ui/connection_form.py](mdc:ui/connection_form.py).
+- Configurações locais e gerenciamento de dados via SQLite, utilizado para armazenar informações de usuários e logs: veja o arquivo [database.py](mdc:database.py).
+- Interface e formulário de usuário para cadastro e edição: veja o arquivo [ui/user_form.py](mdc:ui/user_form.py).
+
+Este guia de estrutura auxilia na navegação e compreensão dos componentes centrais do sistema.
+
