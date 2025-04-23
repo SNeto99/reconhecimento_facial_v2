@@ -55,6 +55,24 @@ def init_db():
         UNIQUE(timestamp, user_id, status, device_id),
         FOREIGN KEY(device_id) REFERENCES dispositivos(id)
     )''')
+    
+    # Cria a tabela de eventos para mapear códigos de eventos para nomes
+    cursor.execute("""CREATE TABLE IF NOT EXISTS eventos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        codigo INTEGER UNIQUE NOT NULL,
+        nome TEXT
+    )""")
+    
+    # Cria a tabela de configurações
+    cursor.execute("""CREATE TABLE IF NOT EXISTS config (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        key TEXT UNIQUE NOT NULL,
+        value TEXT
+    )""")
+    
+    # Insere o evento 15 com o nome padrão 'Validação Facial', se não existir
+    cursor.execute("INSERT OR IGNORE INTO eventos (codigo, nome) VALUES (?, ?)", (15, "Validação Facial"))
+    
     conn.commit()
     conn.close()
 
@@ -272,6 +290,37 @@ def save_device_info(info):
     conn.commit()
     conn.close()
     return device_id
+
+
+def get_event_map():
+    """Retorna um dicionário mapeando códigos de eventos para seus nomes na tabela eventos."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT codigo, nome FROM eventos")
+    rows = cursor.fetchall()
+    conn.close()
+    return {row[0]: row[1] for row in rows}
+
+
+def get_config_value(key, default_value=""):
+    """Retorna o valor da configuração a partir da tabela config."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT value FROM config WHERE key = ?", (key,))
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return row[0]
+    return default_value
+
+
+def set_config_value(key, value):
+    """Insere ou atualiza o valor da configuração na tabela config."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)", (key, value))
+    conn.commit()
+    conn.close()
 
 
 if __name__ == "__main__":

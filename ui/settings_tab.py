@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
+from database import get_config_value, set_config_value
 
 
 class SettingsTab(ttk.Frame):
@@ -16,16 +17,18 @@ class SettingsTab(ttk.Frame):
         ttk.Label(login_frame, text="Login:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
         self.login_entry = ttk.Entry(login_frame)
         self.login_entry.grid(row=0, column=1, padx=5, pady=5, sticky='we')
+        self.login_entry.insert(0, get_config_value("login", ""))
 
         ttk.Label(login_frame, text="Senha:").grid(row=1, column=0, padx=5, pady=5, sticky='w')
         self.password_entry = ttk.Entry(login_frame, show="*")
         self.password_entry.grid(row=1, column=1, padx=5, pady=5, sticky='we')
+        self.password_entry.insert(0, get_config_value("password", ""))
 
         save_cred_button = ttk.Button(login_frame, text="Salvar Credenciais", command=self.save_credentials)
         save_cred_button.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
 
-        # Frame para sincronização com a API
-        sync_frame = ttk.LabelFrame(self, text="Sincronização com API", padding="10")
+        # Novo frame unificado para Sincronização
+        sync_frame = ttk.LabelFrame(self, text="Sincronização", padding="10")
         sync_frame.pack(fill=tk.X, padx=10, pady=5)
 
         self.sync_status = ttk.Label(sync_frame, text="Status: Desconectado")
@@ -34,21 +37,16 @@ class SettingsTab(ttk.Frame):
         sync_button = ttk.Button(sync_frame, text="Sincronizar com API", command=self.sync_with_api)
         sync_button.grid(row=0, column=1, padx=5, pady=5)
 
-        # Frame para configuração do dispositivo
-        device_frame = ttk.LabelFrame(self, text="Configuração do Dispositivo", padding="10")
-        device_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(sync_frame, text="Intervalo (minutos):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
+        self.interval_spinbox = ttk.Spinbox(sync_frame, from_=1, to=1440, width=10)
+        self.interval_spinbox.grid(row=1, column=1, padx=5, pady=5, sticky='we')
 
-        ttk.Label(device_frame, text="IP Padrão do Dispositivo:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.default_ip_entry = ttk.Entry(device_frame)
-        self.default_ip_entry.grid(row=0, column=1, padx=5, pady=5, sticky='we')
+        sync_interval = get_config_value("sync_interval", "10")
+        self.interval_spinbox.delete(0, tk.END)
+        self.interval_spinbox.insert(0, sync_interval)
 
-        # Frame para sincronização automática
-        interval_frame = ttk.LabelFrame(self, text="Sincronização Automática", padding="10")
-        interval_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        ttk.Label(interval_frame, text="Intervalo (minutos):").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.interval_spinbox = ttk.Spinbox(interval_frame, from_=1, to=1440, width=10)
-        self.interval_spinbox.grid(row=0, column=1, padx=5, pady=5, sticky='we')
+        save_sync_button = ttk.Button(sync_frame, text="Salvar Sincronização", command=self.save_sync_config)
+        save_sync_button.grid(row=1, column=2, padx=5, pady=5)
 
         # Frame para exportação de dados
         export_frame = ttk.LabelFrame(self, text="Exportação de Dados", padding="10")
@@ -58,8 +56,12 @@ class SettingsTab(ttk.Frame):
         export_button.pack(padx=5, pady=5)
 
         # Configurar o weight para as colunas que usam grid
-        for frame in [login_frame, device_frame, interval_frame]:
+        for frame in [login_frame]:
             frame.columnconfigure(1, weight=1)
+
+        # Após os frames existentes (antes do fim do método create_widgets), adiciono o botão para gerenciar eventos:
+        events_btn = ttk.Button(self, text="Gerenciar Eventos", command=self.open_events_manager)
+        events_btn.pack(padx=10, pady=10, anchor='e')
 
     def save_credentials(self):
         new_login = self.login_entry.get()
@@ -76,7 +78,8 @@ class SettingsTab(ttk.Frame):
                 messagebox.showerror("Erro", "As senhas não conferem.")
                 return
 
-        # Lógica para salvar as configurações (por exemplo, em um arquivo config.json) poderia ser inserida aqui
+        set_config_value("login", new_login)
+        set_config_value("password", new_password)
         messagebox.showinfo("Sucesso", "Credenciais salvas com sucesso!")
 
     def sync_with_api(self):
@@ -86,4 +89,59 @@ class SettingsTab(ttk.Frame):
 
     def export_data(self):
         # Placeholder para exportação de dados
-        messagebox.showinfo("Exportar Dados", "Dados exportados com sucesso!") 
+        messagebox.showinfo("Exportar Dados", "Dados exportados com sucesso!")
+
+    def connect_device_from_settings(self):
+        ip = self.device_ip_entry.get().strip()
+        if not ip:
+            messagebox.showerror("Erro", "Por favor, insira o IP do dispositivo.")
+            return
+        try:
+            from core.face_device import FaceDevice
+        except ImportError as e:
+            messagebox.showerror("Erro", f"Importação falhou: {e}")
+            return
+        device = FaceDevice(ip)
+        device.set_debug_callback(lambda msg: print(msg))
+        loading_window = tk.Toplevel(self)
+        loading_window.title("Conectando...")
+        ttk.Label(loading_window, text="Conectando...").pack(padx=20, pady=20)
+        loading_window.geometry("200x100")
+        loading_window.transient(self)
+        loading_window.grab_set()
+        
+        import threading
+        def attempt_connection():
+            result = device.connect()
+            self.after(0, lambda: on_connection_result(result))
+        def on_connection_result(result):
+            loading_window.destroy()
+            if result:
+                messagebox.showinfo("Sucesso", "Conectado com sucesso ao dispositivo!")
+                # Atualizar a janela principal
+                toplevel = self.winfo_toplevel()
+                toplevel.device = device
+                toplevel.title("Interface do Dispositivo ZKTeco")
+                if hasattr(toplevel, 'enable_device_controls'):
+                    toplevel.enable_device_controls()
+                else:
+                    print("Função enable_device_controls não implementada")
+                # Atualizar informações na janela principal
+                if hasattr(toplevel, 'refresh_device_info'):
+                    toplevel.refresh_device_info()
+                if hasattr(toplevel, 'refresh_user_list'):
+                    toplevel.refresh_user_list()
+                if hasattr(toplevel, 'refresh_log_list'):
+                    toplevel.refresh_log_list()
+            else:
+                messagebox.showerror("Erro", "Não foi possível conectar ao dispositivo.")
+        threading.Thread(target=attempt_connection, daemon=True).start()
+
+    def open_events_manager(self):
+        from ui.events_manager import EventsManager
+        EventsManager(self)
+
+    def save_sync_config(self):
+        sync_interval = self.interval_spinbox.get()
+        set_config_value("sync_interval", sync_interval)
+        messagebox.showinfo("Sucesso", "Configurações de sincronização salvas com sucesso!") 

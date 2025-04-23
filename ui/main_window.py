@@ -356,10 +356,10 @@ class MainWindow(tk.Tk):
         try:
             for item in self.log_list.get_children():
                 self.log_list.delete(item)
-            from database import get_all_users, synchronize_logs, add_device
+            from database import get_all_users, synchronize_logs, add_device, get_event_map
             local_users = get_all_users()
             user_mapping = {u[1]: u[3] for u in local_users}
-            event_map = {15: "validação facial"}
+            event_map = get_event_map()
             device_info = self.device.get_device_info()
             current_device_id = add_device(device_info.get("mac"))
             device_logs = self.device.get_attendance_logs()
@@ -374,8 +374,12 @@ class MainWindow(tk.Tk):
             logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
             self.log_count_label.config(text=f"Total de logs: {len(logs_sorted)}")
             for log in logs_sorted:
+                try:
+                    status_code = int(log['status'])
+                except:
+                    status_code = log['status']
+                event_name = event_map.get(status_code, log['status'])
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
-                event_name = event_map.get(log['status'], log['status'])
                 self.log_list.insert('', 'end', values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'), student_name, event_name))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar lista de logs: {str(e)}")
@@ -402,6 +406,18 @@ class MainWindow(tk.Tk):
         except Exception as e:
             print("Erro ao desabilitar os controles do dispositivo:", e)
 
+    def enable_device_controls(self):
+        """Habilita os botões que interagem diretamente com o dispositivo."""
+        try:
+            if hasattr(self, 'add_user_button'):
+                self.add_user_button.config(state='normal')
+            if hasattr(self, 'log_refresh_button'):
+                self.log_refresh_button.config(state='normal')
+            if hasattr(self, 'clear_log_button'):
+                self.clear_log_button.config(state='normal')
+        except Exception as e:
+            print("Erro ao habilitar os controles do dispositivo:", e)
+
     def load_local_users(self):
         """Carrega usuários do banco de dados local e atualiza a lista"""
         try:
@@ -418,10 +434,10 @@ class MainWindow(tk.Tk):
     def load_local_logs(self):
         """Carrega logs do banco de dados local e atualiza a lista"""
         try:
-            from database import get_all_logs, get_all_users
+            from database import get_all_logs, get_all_users, get_event_map
             local_users = get_all_users()
             user_mapping = {u[1]: u[3] for u in local_users}
-            event_map = {15: "validação facial"}
+            event_map = get_event_map()
             logs = get_all_logs()
             from datetime import datetime
             for log in logs:
@@ -430,8 +446,12 @@ class MainWindow(tk.Tk):
             logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
             self.log_count_label.config(text=f"Total de logs: {len(logs_sorted)}")
             for log in logs_sorted:
+                try:
+                    status_code = int(log['status'])
+                except:
+                    status_code = log['status']
+                event_name = event_map.get(status_code, log['status'])
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
-                event_name = event_map.get(log['status'], log['status'])
                 self.log_list.insert('', 'end', values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'), student_name, event_name))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar logs locais: {str(e)}")
