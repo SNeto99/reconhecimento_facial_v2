@@ -10,18 +10,28 @@ class SettingsTab(ttk.Frame):
         self.create_widgets()
 
     def create_widgets(self):
+        # Adicionado novo frame para conexão com o dispositivo
+        connection_frame = ttk.LabelFrame(self, text="Conexão com o Dispositivo", padding="10")
+        connection_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(connection_frame, text="IP do Dispositivo:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
+        self.device_ip_entry = ttk.Entry(connection_frame, width=20)
+        self.device_ip_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.device_ip_entry.insert(0, get_config_value("last_connected_ip", "192.168.50.201"))
+        connect_button = ttk.Button(connection_frame, text="Conectar", command=self.connect_device_from_settings)
+        connect_button.grid(row=0, column=2, padx=5, pady=5)
+
         # Frame para dados de login da API
         login_frame = ttk.LabelFrame(self, text="Credenciais da API", padding="10")
         login_frame.pack(fill=tk.X, padx=10, pady=5)
 
         ttk.Label(login_frame, text="Login:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.login_entry = ttk.Entry(login_frame)
-        self.login_entry.grid(row=0, column=1, padx=5, pady=5, sticky='we')
+        self.login_entry = ttk.Entry(login_frame, width=20)
+        self.login_entry.grid(row=0, column=1, padx=5, pady=5)
         self.login_entry.insert(0, get_config_value("login", ""))
 
         ttk.Label(login_frame, text="Senha:").grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.password_entry = ttk.Entry(login_frame, show="*")
-        self.password_entry.grid(row=1, column=1, padx=5, pady=5, sticky='we')
+        self.password_entry = ttk.Entry(login_frame, width=20, show="*")
+        self.password_entry.grid(row=1, column=1, padx=5, pady=5)
         self.password_entry.insert(0, get_config_value("password", ""))
 
         save_cred_button = ttk.Button(login_frame, text="Salvar Credenciais", command=self.save_credentials)
@@ -48,20 +58,42 @@ class SettingsTab(ttk.Frame):
         save_sync_button = ttk.Button(sync_frame, text="Salvar Sincronização", command=self.save_sync_config)
         save_sync_button.grid(row=1, column=2, padx=5, pady=5)
 
-        # Frame para exportação de dados
-        export_frame = ttk.LabelFrame(self, text="Exportação de Dados", padding="10")
-        export_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Container para os formulários de Exportação e Gerenciamento de Eventos
+        forms_container = ttk.Frame(self)
+        forms_container.pack(fill=tk.X, padx=10, pady=5)
 
+        # Formulário para Exportação de Dados
+        export_frame = ttk.LabelFrame(forms_container, text="Exportação de Dados", padding="10")
+        export_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0,5))
         export_button = ttk.Button(export_frame, text="Exportar Dados", command=self.export_data)
         export_button.pack(padx=5, pady=5)
 
-        # Configurar o weight para as colunas que usam grid
-        for frame in [login_frame]:
-            frame.columnconfigure(1, weight=1)
+        # Formulário para Gerenciamento de Eventos
+        events_frame = ttk.LabelFrame(forms_container, text="Gerenciar Eventos", padding="10")
+        events_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(5,0))
+        events_button = ttk.Button(events_frame, text="Gerenciar Eventos", command=self.open_events_manager)
+        events_button.pack(padx=5, pady=5)
 
-        # Após os frames existentes (antes do fim do método create_widgets), adiciono o botão para gerenciar eventos:
-        events_btn = ttk.Button(self, text="Gerenciar Eventos", command=self.open_events_manager)
-        events_btn.pack(padx=10, pady=10, anchor='e')
+        # Novo frame para exibir as Informações do Dispositivo
+        device_info_frame = ttk.LabelFrame(self, text="Informações do Dispositivo", padding="10")
+        device_info_frame.pack(fill=tk.X, padx=10, pady=5)
+        info_mapping = [
+            ("MAC", "MAC"),
+            ("firmware", "Firmware"),
+            ("platform", "Plataforma"),
+            ("serial", "Serial"),
+            ("face_algorithm", "Algoritmo Facial"),
+            ("users", "Usuários"),
+            ("faces", "Faces"),
+            ("records", "Registros"),
+            ("device_name", "Nome do Dispositivo")
+        ]
+        self.device_info_labels = {}
+        for i, (key, label_text) in enumerate(info_mapping):
+            ttk.Label(device_info_frame, text=label_text+":").grid(row=i, column=0, padx=5, pady=2, sticky='w')
+            lbl = ttk.Label(device_info_frame, text="---")
+            lbl.grid(row=i, column=1, padx=5, pady=2, sticky='w')
+            self.device_info_labels[key] = lbl
 
     def save_credentials(self):
         new_login = self.login_entry.get()
@@ -126,13 +158,14 @@ class SettingsTab(ttk.Frame):
                     toplevel.enable_device_controls()
                 else:
                     print("Função enable_device_controls não implementada")
-                # Atualizar informações na janela principal
                 if hasattr(toplevel, 'refresh_device_info'):
                     toplevel.refresh_device_info()
                 if hasattr(toplevel, 'refresh_user_list'):
                     toplevel.refresh_user_list()
                 if hasattr(toplevel, 'refresh_log_list'):
                     toplevel.refresh_log_list()
+                from database import set_config_value
+                set_config_value("last_connected_ip", ip)
             else:
                 messagebox.showerror("Erro", "Não foi possível conectar ao dispositivo.")
         threading.Thread(target=attempt_connection, daemon=True).start()
@@ -144,4 +177,15 @@ class SettingsTab(ttk.Frame):
     def save_sync_config(self):
         sync_interval = self.interval_spinbox.get()
         set_config_value("sync_interval", sync_interval)
-        messagebox.showinfo("Sucesso", "Configurações de sincronização salvas com sucesso!") 
+        messagebox.showinfo("Sucesso", "Configurações de sincronização salvas com sucesso!")
+
+    def update_device_info(self):
+        if not hasattr(self.master, "device") or not self.master.device:
+            return
+        try:
+            info = self.master.device.get_device_info()
+            if info:
+                for key, lbl in self.device_info_labels.items():
+                    lbl.config(text=str(info.get(key, '---')))
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao obter informações do dispositivo: {str(e)}") 
