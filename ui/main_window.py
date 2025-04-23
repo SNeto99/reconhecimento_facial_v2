@@ -12,7 +12,7 @@ class MainWindow(tk.Tk):
         self.title("Interface do Dispositivo ZKTeco")
         
         # Configura o tamanho fixo da janela
-        self.geometry("800x726")
+        self.geometry("680x750")
         
         # Inicializa o dispositivo
         self.device = device
@@ -47,8 +47,43 @@ class MainWindow(tk.Tk):
             self.load_local_users()
             self.load_local_logs()
 
-        settings_widget = SettingsTab(self.settings_tab)
-        settings_widget.pack(fill="both", expand=True)
+        # Criar área scrollable para a aba de Configurações
+        settings_canvas = tk.Canvas(self.settings_tab, borderwidth=0, highlightthickness=0)
+        settings_scrollbar = ttk.Scrollbar(self.settings_tab, orient="vertical", command=settings_canvas.yview)
+        settings_canvas.configure(yscrollcommand=settings_scrollbar.set)
+        settings_scrollbar.pack(side="right", fill="y")
+        settings_canvas.pack(side="left", fill="both", expand=True)
+        # Adicionar o widget de configurações dentro do canvas e ajustar largura
+        settings_widget = SettingsTab(settings_canvas)
+        settings_canvas_window = settings_canvas.create_window((0, 0), window=settings_widget, anchor="nw")
+        # Ajustar a região scrollable e largura do conteúdo sempre que necessário
+        def _on_configure(event):
+            # Ajusta o width do window interno para preencher toda a canvas
+            settings_canvas.itemconfig(settings_canvas_window, width=event.width)
+            # Atualiza região de scroll
+            settings_canvas.configure(scrollregion=settings_canvas.bbox("all"))
+        # Handle resize of canvas
+        settings_canvas.bind("<Configure>", _on_configure)
+        # Handle mudanças no conteúdo
+        settings_widget.bind("<Configure>", lambda e: settings_canvas.configure(scrollregion=settings_canvas.bbox("all")))
+        
+        # Funções para ativar/desativar scroll com a roda do mouse
+        def _on_mousewheel(event):
+            settings_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+
+        def _bind_scroll(event):
+            settings_canvas.bind_all("<MouseWheel>", _on_mousewheel)
+            settings_canvas.bind_all("<Button-4>", lambda e: settings_canvas.yview_scroll(-1, "units"))
+            settings_canvas.bind_all("<Button-5>", lambda e: settings_canvas.yview_scroll(1, "units"))
+
+        def _unbind_scroll(event):
+            settings_canvas.unbind_all("<MouseWheel>")
+            settings_canvas.unbind_all("<Button-4>")
+            settings_canvas.unbind_all("<Button-5>")
+
+        # Vincula ao entrar/ sair do canvas de configurações
+        settings_canvas.bind("<Enter>", _bind_scroll)
+        settings_canvas.bind("<Leave>", _unbind_scroll)
         
     def create_device_tab(self):
         frame = ttk.Frame(self.device_tab, padding="10")

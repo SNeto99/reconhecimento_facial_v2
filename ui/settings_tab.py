@@ -77,8 +77,10 @@ class SettingsTab(ttk.Frame):
         # Novo frame para exibir as Informações do Dispositivo
         device_info_frame = ttk.LabelFrame(self, text="Informações do Dispositivo", padding="10")
         device_info_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Permitir expansão da segunda coluna
+        device_info_frame.columnconfigure(1, weight=1)
         info_mapping = [
-            ("MAC", "MAC"),
+            ("mac", "MAC"),
             ("firmware", "Firmware"),
             ("platform", "Plataforma"),
             ("serial", "Serial"),
@@ -94,6 +96,17 @@ class SettingsTab(ttk.Frame):
             lbl = ttk.Label(device_info_frame, text="---")
             lbl.grid(row=i, column=1, padx=5, pady=2, sticky='w')
             self.device_info_labels[key] = lbl
+        # Criar subframe para o botão para não misturar grid e pack no mesmo container
+        button_frame = ttk.Frame(device_info_frame)
+        button_frame.grid(row=len(info_mapping), column=0, columnspan=2, sticky='we', padx=5, pady=(20,20))
+        # Expandir o frame do botão
+        button_frame.columnconfigure(0, weight=1)
+        update_info_button = ttk.Button(button_frame, text="Atualizar Informações", command=self.update_device_info)
+        update_info_button.pack(side=tk.RIGHT, padx=5)
+        # Preencher automaticamente as informações se já estiver conectado
+        toplevel = self.winfo_toplevel()
+        if hasattr(toplevel, 'device') and toplevel.device:
+            self.update_device_info()
 
     def save_credentials(self):
         new_login = self.login_entry.get()
@@ -166,6 +179,7 @@ class SettingsTab(ttk.Frame):
                     toplevel.refresh_log_list()
                 from database import set_config_value
                 set_config_value("last_connected_ip", ip)
+                self.update_device_info()
             else:
                 messagebox.showerror("Erro", "Não foi possível conectar ao dispositivo.")
         threading.Thread(target=attempt_connection, daemon=True).start()
@@ -180,10 +194,11 @@ class SettingsTab(ttk.Frame):
         messagebox.showinfo("Sucesso", "Configurações de sincronização salvas com sucesso!")
 
     def update_device_info(self):
-        if not hasattr(self.master, "device") or not self.master.device:
+        toplevel = self.winfo_toplevel()
+        if not hasattr(toplevel, "device") or not toplevel.device:
             return
         try:
-            info = self.master.device.get_device_info()
+            info = toplevel.device.get_device_info()
             if info:
                 for key, lbl in self.device_info_labels.items():
                     lbl.config(text=str(info.get(key, '---')))

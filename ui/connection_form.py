@@ -7,6 +7,8 @@ from ui.main_window import MainWindow
 class ConnectionForm(tk.Tk):
     def __init__(self):
         super().__init__()
+        # Guardar id do after para cancelar se necessário
+        self._timeout_id = None
         self.title("Conectar Dispositivo")
         self.geometry("300x150")
         self.resizable(False, False)
@@ -68,7 +70,7 @@ class ConnectionForm(tk.Tk):
         self.connection_thread.start()
         
         # Agenda verificação de timeout após 5 segundos
-        self.after(5000, self.check_connection_timeout)
+        self._timeout_id = self.after(5000, self.check_connection_timeout)
         
     def connection_thread_func(self, device):
         result = device.connect()
@@ -76,6 +78,10 @@ class ConnectionForm(tk.Tk):
         
     def on_connection_result(self, result, device):
         self.connection_finished = True
+        # Cancela timeout agendado para evitar chamada em widget destruído
+        if hasattr(self, '_timeout_id') and self._timeout_id:
+            self.after_cancel(self._timeout_id)
+            self._timeout_id = None
         if result:
             self.destroy()
             main_window = MainWindow(device=device)
@@ -113,6 +119,10 @@ class ConnectionForm(tk.Tk):
         self.build_ui()
         
     def continue_without_connection(self):
+        # Cancela timeout agendado antes de destruir
+        if hasattr(self, '_timeout_id') and self._timeout_id:
+            self.after_cancel(self._timeout_id)
+            self._timeout_id = None
         self.destroy()
         main_window = MainWindow(device=None)
         main_window.disable_device_controls()  # método que desabilita botões que interagem com o dispositivo
