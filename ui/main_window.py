@@ -359,6 +359,18 @@ class MainWindow(tk.Tk):
         self.clear_log_button = ttk.Button(button_frame, text="Limpar Logs", command=self.clear_logs)
         self.clear_log_button.pack(side=tk.LEFT, padx=5)
         
+        # Filtro de data: intervalo inicial e final
+        filter_frame = ttk.Frame(frame)
+        filter_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(filter_frame, text="Data Início (DD/MM/YYYY):").pack(side=tk.LEFT, padx=5)
+        self.start_date_entry = ttk.Entry(filter_frame, width=12)
+        self.start_date_entry.pack(side=tk.LEFT)
+        ttk.Label(filter_frame, text="Data Fim (DD/MM/YYYY):").pack(side=tk.LEFT, padx=5)
+        self.end_date_entry = ttk.Entry(filter_frame, width=12)
+        self.end_date_entry.pack(side=tk.LEFT)
+        filter_btn = ttk.Button(filter_frame, text="Filtrar", command=self.refresh_log_list)
+        filter_btn.pack(side=tk.LEFT, padx=5)
+        
         # Rótulo para exibir a contagem de logs
         self.log_count_label = ttk.Label(frame, text="Total de logs: 0")
         self.log_count_label.pack(fill=tk.X, padx=10, pady=5)
@@ -437,12 +449,35 @@ class MainWindow(tk.Tk):
                 log['device_id'] = current_device_id
             logs = synchronize_logs(device_logs)
             from datetime import datetime
+            # Converte timestamps de string para datetime
             for log in logs:
-                if not isinstance(log['timestamp'], datetime):
-                    log['timestamp'] = datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S")
+                if isinstance(log['timestamp'], str):
+                    try:
+                        log['timestamp'] = datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S")
+                    except:
+                        pass
             logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
-            self.log_count_label.config(text=f"Total de logs: {len(logs_sorted)}")
-            for log in logs_sorted:
+            # Filtro de datas
+            start_str = self.start_date_entry.get().strip()
+            end_str = self.end_date_entry.get().strip()
+            start_date = None
+            end_date = None
+            if start_str:
+                try:
+                    start_date = datetime.strptime(start_str, "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de Data Início inválido. Use DD/MM/YYYY.")
+                    return
+            if end_str:
+                try:
+                    end_date = datetime.strptime(end_str, "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de Data Fim inválido. Use DD/MM/YYYY.")
+                    return
+            # Aplica filtro de intervalo nas datas
+            filtered_logs = [log for log in logs_sorted if not ((start_date and log['timestamp'].date() < start_date) or (end_date and log['timestamp'].date() > end_date))]
+            self.log_count_label.config(text=f"Total de logs: {len(filtered_logs)}")
+            for log in filtered_logs:
                 try:
                     status_code = int(log['status'])
                 except:
@@ -514,17 +549,37 @@ class MainWindow(tk.Tk):
         """Carrega logs do banco de dados local e atualiza a lista"""
         try:
             from database import get_all_logs, get_all_users, get_event_map
+            from datetime import datetime
             local_users = get_all_users()
             user_mapping = {u[1]: u[3] for u in local_users}
             event_map = get_event_map()
             logs = get_all_logs()
-            from datetime import datetime
+            # Converte timestamps para datetime
             for log in logs:
                 if not isinstance(log['timestamp'], datetime):
                     log['timestamp'] = datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S")
             logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
-            self.log_count_label.config(text=f"Total de logs: {len(logs_sorted)}")
-            for log in logs_sorted:
+            # Filtro de datas
+            start_str = self.start_date_entry.get().strip()
+            end_str = self.end_date_entry.get().strip()
+            start_date = None
+            end_date = None
+            if start_str:
+                try:
+                    start_date = datetime.strptime(start_str, "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de Data Início inválido. Use DD/MM/YYYY.")
+                    return
+            if end_str:
+                try:
+                    end_date = datetime.strptime(end_str, "%d/%m/%Y").date()
+                except ValueError:
+                    messagebox.showerror("Erro", "Formato de Data Fim inválido. Use DD/MM/YYYY.")
+                    return
+            # Aplica filtro de intervalo nas datas
+            filtered = [log for log in logs_sorted if not ((start_date and log['timestamp'].date() < start_date) or (end_date and log['timestamp'].date() > end_date))]
+            self.log_count_label.config(text=f"Total de logs: {len(filtered)}")
+            for log in filtered:
                 try:
                     status_code = int(log['status'])
                 except:
@@ -533,11 +588,7 @@ class MainWindow(tk.Tk):
                 event_name = event_map.get(status_code, log['status'])
                 # Exibe data/hora no formato DD/MM/YYYY HH:MM:SS
                 ts_display = log['timestamp'].strftime('%d/%m/%Y %H:%M:%S')
-                self.log_list.insert('', 'end', values=(
-                    ts_display,
-                    student_name,
-                    event_name
-                ))
+                self.log_list.insert('', 'end', values=(ts_display, student_name, event_name))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar logs locais: {str(e)}")
 
