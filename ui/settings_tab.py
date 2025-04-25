@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 from database import get_config_value, set_config_value
+from core.api import buscar_cidades, buscar_escolas_cidade
 
 
 class SettingsTab(ttk.Frame):
@@ -20,23 +21,6 @@ class SettingsTab(ttk.Frame):
         connect_button = ttk.Button(connection_frame, text="Conectar", command=self.connect_device_from_settings)
         connect_button.grid(row=0, column=2, padx=5, pady=5)
 
-        # Frame para dados de login da API
-        login_frame = ttk.LabelFrame(self, text="Credenciais da API", padding="10")
-        login_frame.pack(fill=tk.X, padx=10, pady=5)
-
-        ttk.Label(login_frame, text="Login:").grid(row=0, column=0, padx=5, pady=5, sticky='w')
-        self.login_entry = ttk.Entry(login_frame, width=20)
-        self.login_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.login_entry.insert(0, get_config_value("login", ""))
-
-        ttk.Label(login_frame, text="Senha:").grid(row=1, column=0, padx=5, pady=5, sticky='w')
-        self.password_entry = ttk.Entry(login_frame, width=20, show="*")
-        self.password_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.password_entry.insert(0, get_config_value("password", ""))
-
-        save_cred_button = ttk.Button(login_frame, text="Salvar Credenciais", command=self.save_credentials)
-        save_cred_button.grid(row=2, column=0, columnspan=2, padx=5, pady=5)
-
         # Novo frame unificado para Sincronização
         sync_frame = ttk.LabelFrame(self, text="Sincronização", padding="10")
         sync_frame.pack(fill=tk.X, padx=10, pady=5)
@@ -55,7 +39,7 @@ class SettingsTab(ttk.Frame):
         self.interval_spinbox.delete(0, tk.END)
         self.interval_spinbox.insert(0, sync_interval)
 
-        save_sync_button = ttk.Button(sync_frame, text="Salvar Sincronização", command=self.save_sync_config)
+        save_sync_button = ttk.Button(sync_frame, text="Salvar", command=self.save_sync_config)
         save_sync_button.grid(row=1, column=2, padx=5, pady=5)
 
         # Container para os formulários de Exportação e Gerenciamento de Eventos
@@ -107,25 +91,145 @@ class SettingsTab(ttk.Frame):
         toplevel = self.winfo_toplevel()
         if hasattr(toplevel, 'device') and toplevel.device:
             self.update_device_info()
+        # Por fim, bloco de Configurar API (movido para baixo)
+        api_frame = ttk.LabelFrame(self, text="Configurar API", padding="10")
+        api_frame.pack(fill=tk.X, padx=10, pady=5)
+        api_button = ttk.Button(api_frame, text="Configurar API", command=self.open_api_config_window)
+        api_button.pack(padx=5, pady=5)
 
-    def save_credentials(self):
-        new_login = self.login_entry.get()
-        new_password = self.password_entry.get()
-        if not new_login or not new_password:
-            messagebox.showerror("Erro", "Ambos os campos de credenciais são obrigatórios.")
-            return
+    def save_sync_config(self):
+        sync_interval = self.interval_spinbox.get()
+        set_config_value("sync_interval", sync_interval)
+        messagebox.showinfo("Sucesso", "Configurações de sincronização salvas com sucesso!")
 
-        # Confirmação de senha
-        confirm = messagebox.askyesno("Confirmar", "Deseja alterar a senha?")
-        if confirm:
-            senha_repetida = simpledialog.askstring("Confirmação", "Digite a senha novamente:", show="*")
-            if senha_repetida != new_password:
-                messagebox.showerror("Erro", "As senhas não conferem.")
+    def open_api_config_window(self):
+        # Cria janela de configuração de API
+        win = tk.Toplevel(self)
+        win.title("Configurar API")
+        win.geometry("800x650")
+        win.resizable(True, True)
+        # Inicializa mapas e seleção
+        city_map = {}
+        school_map = {}
+        selected_school = {}
+
+        # URL da API
+        url_frame = ttk.LabelFrame(win, text="URL da API", padding="10")
+        url_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(url_frame, text="Base URL:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        api_url_entry = ttk.Entry(url_frame, width=40)
+        api_url_entry.grid(row=0, column=1, padx=5, pady=5)
+        api_url_entry.insert(0, get_config_value("api_url", ""))
+
+        # Credenciais da API
+        cred_frame = ttk.LabelFrame(win, text="Credenciais da API", padding="10")
+        cred_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(cred_frame, text="Login:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        login_entry = ttk.Entry(cred_frame, width=30)
+        login_entry.grid(row=0, column=1, padx=5, pady=5)
+        login_entry.insert(0, get_config_value("login", ""))
+        ttk.Label(cred_frame, text="Senha:").grid(row=1, column=0, sticky='w', padx=5, pady=5)
+        password_entry = ttk.Entry(cred_frame, width=30, show="*")
+        password_entry.grid(row=1, column=1, padx=5, pady=5)
+        password_entry.insert(0, get_config_value("password", ""))
+
+        # Seleção de Cidade
+        city_frame = ttk.LabelFrame(win, text="Seleção de Cidade", padding="10")
+        city_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(city_frame, text="Cidade:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        city_combobox = ttk.Combobox(city_frame, state="readonly", width=30)
+        city_combobox.grid(row=0, column=1, padx=5, pady=5)
+        # Buscar cidades via API
+        try:
+            cidades = buscar_cidades()
+            city_names = [c['nome'] for c in cidades]
+            city_map = {c['nome']: c['id'] for c in cidades}
+            city_combobox['values'] = city_names
+            current_city = get_config_value("city_name", "")
+            if current_city in city_names:
+                city_combobox.set(current_city)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Não foi possível buscar cidades: {e}")
+
+        # Seleção de Escola
+        school_frame = ttk.LabelFrame(win, text="Seleção de Escola", padding="10")
+        school_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(school_frame, text="Buscar Escola:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
+        school_search_entry = ttk.Entry(school_frame, width=30)
+        school_search_entry.grid(row=0, column=1, padx=5, pady=5)
+        search_school_button = ttk.Button(school_frame, text="Buscar Escola", state="disabled")
+        search_school_button.grid(row=0, column=2, padx=5, pady=5)
+        # Listbox de resultados limpa e expansível
+        school_frame.rowconfigure(1, weight=1)
+        school_frame.columnconfigure(0, weight=1)
+        school_frame.columnconfigure(1, weight=1)
+        school_listbox = tk.Listbox(school_frame)
+        school_listbox.grid(row=1, column=0, columnspan=2, sticky='nsew', padx=5, pady=5)
+        scrollbar = ttk.Scrollbar(school_frame, orient="vertical", command=school_listbox.yview)
+        scrollbar.grid(row=1, column=2, sticky='ns', padx=5, pady=5)
+        school_listbox.config(yscrollcommand=scrollbar.set)
+        # Botão de seleção (não persiste ainda)
+        link_school_button = ttk.Button(school_frame, text="Selecionar", state="disabled")
+        link_school_button.grid(row=2, column=2, sticky='e', padx=5, pady=5)
+        # Label de confirmação da escola selecionada (persistida)
+        selected_label = ttk.Label(school_frame, text=f"Selecionada: {get_config_value('school_name','---')}")
+        selected_label.grid(row=3, column=0, columnspan=2, sticky='w', padx=5, pady=5)
+
+        # Habilita busca se já há cidade selecionada e ao escolher uma cidade
+        if city_combobox.get():
+            search_school_button.config(state="normal")
+        # Habilita botão de busca ao selecionar qualquer nova cidade
+        city_combobox.bind("<<ComboboxSelected>>", lambda e: search_school_button.config(state="normal"))
+
+        def on_search_school():
+            idcidade = city_map.get(city_combobox.get())
+            if not idcidade:
+                messagebox.showerror("Erro", "Selecione uma cidade válida primeiro.")
                 return
+            try:
+                escolas = buscar_escolas_cidade(idcidade, school_search_entry.get().strip())
+                school_listbox.delete(0, tk.END)
+                school_map.clear()
+                for e in escolas:
+                    text = e['nome']
+                    school_listbox.insert(tk.END, text)
+                    school_map[text] = e
+                link_school_button.config(state="normal")
+            except Exception as e:
+                messagebox.showerror("Erro", f"Erro ao buscar escolas: {e}")
 
-        set_config_value("login", new_login)
-        set_config_value("password", new_password)
-        messagebox.showinfo("Sucesso", "Credenciais salvas com sucesso!")
+        search_school_button.config(command=on_search_school)
+
+        def on_select_school():
+            sel = school_listbox.curselection()
+            if not sel:
+                messagebox.showwarning("Atenção", "Selecione uma escola.")
+                return
+            text = school_listbox.get(sel[0])
+            e = school_map.get(text)
+            # Atualiza label de confirmação e guarda na variável
+            selected_label.config(text=f"Selecionada: {e['nome']}")
+            selected_school.clear()
+            selected_school.update(e)
+
+        link_school_button.config(command=on_select_school)
+
+        def on_save_close():
+            # Persiste configuração de API
+            set_config_value("api_url", api_url_entry.get().strip())
+            set_config_value("login", login_entry.get().strip())
+            set_config_value("password", password_entry.get().strip())
+            # Persiste cidade e escola selecionadas
+            if city_combobox.get():
+                set_config_value("city_id", str(city_map[city_combobox.get()]))
+                set_config_value("city_name", city_combobox.get())
+            if selected_school:
+                set_config_value("school_id", str(selected_school['id']))
+                set_config_value("school_name", selected_school['nome'])
+            win.destroy()
+
+        save_button = ttk.Button(win, text="Salvar e Sair", command=on_save_close)
+        save_button.pack(pady=10)
 
     def sync_with_api(self):
         self.sync_status.config(text="Status: Sincronizando...")
@@ -187,11 +291,6 @@ class SettingsTab(ttk.Frame):
     def open_events_manager(self):
         from ui.events_manager import EventsManager
         EventsManager(self)
-
-    def save_sync_config(self):
-        sync_interval = self.interval_spinbox.get()
-        set_config_value("sync_interval", sync_interval)
-        messagebox.showinfo("Sucesso", "Configurações de sincronização salvas com sucesso!")
 
     def update_device_info(self):
         toplevel = self.winfo_toplevel()

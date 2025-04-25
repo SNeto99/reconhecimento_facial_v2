@@ -1,4 +1,3 @@
-tkinter
 pyzkaccess
-ctypes
 pillow 
+requests 

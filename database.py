@@ -30,15 +30,20 @@ def init_db():
         )
     """)
     
-    # Cria a tabela de usuários com referência ao dispositivo
+    # Cria a tabela de usuários com referência ao dispositivo e campos adicionais
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_user_id TEXT,
             system_id TEXT,
             name TEXT,
+            api_name TEXT,
+            ra TEXT,
+            serie TEXT,
+            turma TEXT,
             device_id INTEGER,
             synced INTEGER DEFAULT 0,
+            active INTEGER DEFAULT 1,
             UNIQUE(device_user_id, device_id),
             FOREIGN KEY(device_id) REFERENCES dispositivos(id)
         )
@@ -73,11 +78,17 @@ def init_db():
     # Insere o evento 15 com o nome padrão 'Validação Facial', se não existir
     cursor.execute("INSERT OR IGNORE INTO eventos (codigo, nome) VALUES (?, ?)", (15, "Validação Facial"))
     
+    # Adiciona coluna 'active' à tabela de usuários, ignorando se já existe
+    try:
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN active INTEGER DEFAULT 1")
+    except sqlite3.OperationalError:
+        pass
+    
     conn.commit()
     conn.close()
 
 
-def insert_or_update_user(device_user_id, system_id, name, device_id):
+def insert_or_update_user(device_user_id, system_id, alias_name, api_name, ra, serie, turma, device_id):
     """
     Insere um novo usuário ou atualiza o existente com referência ao dispositivo.
     Sempre marca o registro como não sincronizado (synced = 0).
@@ -89,14 +100,14 @@ def insert_or_update_user(device_user_id, system_id, name, device_id):
     if result:
         cursor.execute("""
             UPDATE usuarios
-            SET system_id = ?, name = ?, synced = 0
+            SET system_id = ?, name = ?, api_name = ?, ra = ?, serie = ?, turma = ?, synced = 0, active = 1
             WHERE device_user_id = ? AND device_id = ?
-        """, (system_id, name, device_user_id, device_id))
+        """, (system_id, alias_name, api_name, ra, serie, turma, device_user_id, device_id))
     else:
         cursor.execute("""
-            INSERT INTO usuarios (device_user_id, system_id, name, device_id, synced)
-            VALUES (?, ?, ?, ?, 0)
-        """, (device_user_id, system_id, name, device_id))
+            INSERT INTO usuarios (device_user_id, system_id, name, api_name, ra, serie, turma, device_id, synced, active)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+        """, (device_user_id, system_id, alias_name, api_name, ra, serie, turma, device_id))
     conn.commit()
     conn.close()
 
@@ -124,11 +135,14 @@ def get_unsynced_users():
     return rows
 
 
-def get_all_users():
+def get_all_users(active_only=True):
     """Retorna todos os registros de usuários."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM usuarios")
+    if active_only:
+        cursor.execute("SELECT * FROM usuarios WHERE active = 1")
+    else:
+        cursor.execute("SELECT * FROM usuarios")
     rows = cursor.fetchall()
     conn.close()
     return rows
@@ -206,17 +220,39 @@ def synchronize_users(device_users, current_device_id):
     # Usa current_device_id para associar todos os usuários vindos do dispositivo
     device_keys = set((str(u['user_id']), current_device_id) for u in device_users)
 
-    # Remove usuários que estão no banco para esse device_id e que não estão mais presentes no dispositivo
+    # Marca como inativo usuários que não estão mais presentes no dispositivo
     for key, user_id in local_users.items():
         if key[1] == current_device_id and key not in device_keys:
-            cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+            cursor.execute("UPDATE usuarios SET active = 0 WHERE id = ?", (user_id,))
 
     conn.commit()
     conn.close()
 
-    # Insere ou atualiza os usuários presentes no dispositivo usando o current_device_id
+    # Insere ou reativa usuários presentes no dispositivo
     for user in device_users:
-        insert_or_update_user(str(user['user_id']), user.get('system_id', ''), user['name'], current_device_id)
+        key = (str(user['user_id']), current_device_id)
+        if key not in local_users:
+            # Novo usuário
+            insert_or_update_user(
+                str(user['user_id']),
+                user.get('system_id', ''),
+                user['name'],
+                user.get('api_name', ''),
+                user.get('ra', ''),
+                user.get('serie', ''),
+                user.get('turma', ''),
+                current_device_id
+            )
+        else:
+            # Reativa usuário previamente inativo
+            conn2 = get_connection()
+            cursor2 = conn2.cursor()
+            cursor2.execute(
+                "UPDATE usuarios SET active = 1 WHERE device_user_id = ? AND device_id = ?",
+                (str(user['user_id']), current_device_id)
+            )
+            conn2.commit()
+            conn2.close()
 
     return get_all_users()
 

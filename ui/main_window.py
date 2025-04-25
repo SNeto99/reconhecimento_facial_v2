@@ -290,19 +290,37 @@ class MainWindow(tk.Tk):
             return
             
         try:
-            # Obtém dados do usuário
-            users = self.device.get_users()
-            user = next((u for u in users if u['user_id'] == str(user_id)), None)
-            
-            if user:
-                form = UserForm(self, self.device, user=user)
-                self.wait_window(form)  # Espera a janela de edição fechar
-                self.refresh_user_list()  # Atualiza a lista após o fechamento
-            else:
-                messagebox.showerror("Erro", "Usuário não encontrado.")
-                
-        except Exception as e:
-            self.refresh_user_list()  # Atualiza a lista mesmo em caso de erro
+            # Obtém metadados do usuário no banco
+            from database import add_device, get_connection
+            device_info = self.device.get_device_info()
+            current_device_id = add_device(device_info.get("mac"))
+            conn = get_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT device_user_id, system_id, name, api_name, ra, serie, turma "
+                "FROM usuarios WHERE device_user_id = ? AND device_id = ? AND active = 1",
+                (str(user_id), current_device_id)
+            )
+            row = cursor.fetchone()
+            conn.close()
+            if not row:
+                messagebox.showerror("Erro", "Usuário não encontrado no banco de dados.")
+                return
+            # Monta dicionário de dados para o formulário
+            user = {
+                'user_id': row[0],
+                'system_id': row[1],
+                'name': row[2],
+                'api_name': row[3],
+                'ra': row[4],
+                'serie': row[5],
+                'turma': row[6]
+            }
+            form = UserForm(self, self.device, user=user)
+            self.wait_window(form)
+            self.refresh_user_list()
+        except Exception:
+            self.refresh_user_list()
 
     def delete_user(self, user_id):
         """Deleta um usuário"""
@@ -360,7 +378,10 @@ class MainWindow(tk.Tk):
             messagebox.showerror("Erro", "Por favor, conecte-se ao dispositivo primeiro.")
             return
             
-        UserForm(self, self.device)
+        form = UserForm(self, self.device)
+        # Aguarda o formulário fechar e então atualiza a lista automaticamente
+        self.wait_window(form)
+        self.refresh_user_list()
         
     def refresh_user_list(self):
         """Atualiza a lista de usuários a partir do dispositivo, se conectado"""
