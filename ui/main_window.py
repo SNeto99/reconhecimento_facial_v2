@@ -364,13 +364,20 @@ class MainWindow(tk.Tk):
         filter_frame = ttk.Frame(frame)
         filter_frame.pack(fill=tk.X, pady=5)
         ttk.Label(filter_frame, text="Data Início:").pack(side=tk.LEFT, padx=5)
+        # Inicializa data com 30 dias atrás
+        from datetime import date, timedelta
+        today = date.today()
         self.start_date_entry = DateEntry(filter_frame, date_pattern='dd/MM/yyyy', width=12)
+        self.start_date_entry.set_date(today - timedelta(days=30))
         self.start_date_entry.pack(side=tk.LEFT)
         ttk.Label(filter_frame, text="Data Fim:").pack(side=tk.LEFT, padx=5)
         self.end_date_entry = DateEntry(filter_frame, date_pattern='dd/MM/yyyy', width=12)
+        self.end_date_entry.set_date(today)
         self.end_date_entry.pack(side=tk.LEFT)
         filter_btn = ttk.Button(filter_frame, text="Filtrar", command=self.refresh_log_list)
         filter_btn.pack(side=tk.LEFT, padx=5)
+        clear_filter_btn = ttk.Button(filter_frame, text="Limpar Filtro", command=self.clear_date_filter)
+        clear_filter_btn.pack(side=tk.LEFT, padx=5)
         
         # Rótulo para exibir a contagem de logs
         self.log_count_label = ttk.Label(frame, text="Total de logs: 0")
@@ -463,7 +470,7 @@ class MainWindow(tk.Tk):
             end_date = self.end_date_entry.get_date()
             if start_date and end_date:
                 # Aplica filtro de intervalo nas datas
-                filtered_logs = [log for log in logs_sorted if not ((start_date <= log['timestamp'].date() <= end_date) or (start_date <= log['timestamp'].date() <= end_date))]
+                filtered_logs = [log for log in logs_sorted if start_date <= log['timestamp'].date() <= end_date]
             else:
                 filtered_logs = logs_sorted
             self.log_count_label.config(text=f"Total de logs: {len(filtered_logs)}")
@@ -562,7 +569,7 @@ class MainWindow(tk.Tk):
             end_date = self.end_date_entry.get_date()
             if start_date and end_date:
                 # Aplica filtro de intervalo nas datas
-                filtered = [log for log in logs_sorted if not ((start_date <= log['timestamp'].date() <= end_date) or (start_date <= log['timestamp'].date() <= end_date))]
+                filtered = [log for log in logs_sorted if start_date <= log['timestamp'].date() <= end_date]
             else:
                 filtered = logs_sorted
             self.log_count_label.config(text=f"Total de logs: {len(filtered)}")
@@ -597,3 +604,13 @@ class MainWindow(tk.Tk):
             self.wait_window(detail)
         except Exception as e:
             messagebox.showerror("Erro", f"Não foi possível abrir detalhes: {str(e)}")
+
+    def clear_date_filter(self):
+        """Limpa os filtros de data e atualiza a lista de logs"""
+        from datetime import datetime, date, timedelta
+        today = date.today()
+        # Define valores padrão: 30 dias atrás até hoje
+        self.start_date_entry.set_date(today - timedelta(days=30))
+        self.end_date_entry.set_date(today)
+        # Atualiza sem filtro
+        self.refresh_log_list()

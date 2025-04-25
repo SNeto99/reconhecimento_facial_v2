@@ -139,18 +139,53 @@ class SettingsTab(ttk.Frame):
         ttk.Label(city_frame, text="Cidade:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
         city_combobox = ttk.Combobox(city_frame, state="readonly", width=30)
         city_combobox.grid(row=0, column=1, padx=5, pady=5)
-        # Buscar cidades via API
-        try:
-            cidades = buscar_cidades()
-            city_names = [c['nome'] for c in cidades]
-            city_map = {c['nome']: c['id'] for c in cidades}
-            city_combobox['values'] = city_names
-            current_city = get_config_value("city_name", "")
-            if current_city in city_names:
-                city_combobox.set(current_city)
-        except Exception as e:
-            messagebox.showerror("Erro", f"Não foi possível buscar cidades: {e}")
-
+        
+        # Botão para atualizar cidades após configurar a URL
+        def refresh_cities():
+            api_url = api_url_entry.get().strip()
+            if not api_url:
+                messagebox.showwarning("Aviso", "Configure a URL da API primeiro.", parent=win)
+                return
+            # Salva URL temporariamente para que buscar_cidades possa usá-la
+            from database import set_config_value
+            set_config_value("api_url", api_url)
+            try:
+                cidades = buscar_cidades()
+                if not cidades:
+                    messagebox.showinfo("Informação", "Nenhuma cidade encontrada. Verifique a URL da API.", parent=win)
+                    return
+                city_names = [c['nome'] for c in cidades]
+                city_map.clear()
+                city_map.update({c['nome']: c['id'] for c in cidades})
+                city_combobox['values'] = city_names
+                current_city = get_config_value("city_name", "")
+                if current_city in city_names:
+                    city_combobox.set(current_city)
+                else:
+                    city_combobox.set('')  # Limpa seleção atual se não for válida
+                messagebox.showinfo("Sucesso", f"Lista de cidades atualizada: {len(cidades)} encontradas.", parent=win)
+            except Exception as e:
+                messagebox.showerror("Erro", f"Não foi possível buscar cidades: {e}", parent=win)
+        
+        refresh_cities_btn = ttk.Button(city_frame, text="Atualizar", command=refresh_cities)
+        refresh_cities_btn.grid(row=0, column=2, padx=5, pady=5)
+        
+        # Tentativa inicial de carregar cidades se houver URL configurada
+        api_url = get_config_value("api_url", "")
+        if api_url:
+            try:
+                cidades = buscar_cidades()
+                if cidades:
+                    city_names = [c['nome'] for c in cidades]
+                    city_map.update({c['nome']: c['id'] for c in cidades})
+                    city_combobox['values'] = city_names
+                    current_city = get_config_value("city_name", "")
+                    if current_city in city_names:
+                        city_combobox.set(current_city)
+            except Exception:
+                # Silenciosamente ignora erros na carga inicial
+                pass
+        
         # Seleção de Escola
         school_frame = ttk.LabelFrame(win, text="Seleção de Escola", padding="10")
         school_frame.pack(fill=tk.X, padx=10, pady=5)

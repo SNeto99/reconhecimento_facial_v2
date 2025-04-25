@@ -5,11 +5,6 @@ import urllib.request
 import urllib.error
 from database import get_config_value
 
-# Simulação da API
-def simular_busca_aluno(ra_nome):
-    # Simula uma busca na API e retorna um ID de aluno
-    # Em um cenário real, você faria uma requisição HTTP para sua API
-    return random.randint(1000, 9999)
 
 def buscar_cidades():
     """
@@ -18,7 +13,8 @@ def buscar_cidades():
     """
     api_url = get_config_value("api_url", "")
     if not api_url:
-        raise Exception("URL da API não está configurada. Defina 'api_url' em config.")
+        # Retornar lista vazia em vez de lançar exceção
+        return []
     url = f"{api_url}/escolas/buscarCidades"
     try:
         with urllib.request.urlopen(url) as resp:
@@ -49,7 +45,8 @@ def buscar_escolas_cidade(idcidade, nomebuscar):
     """
     api_url = get_config_value("api_url", "")
     if not api_url:
-        raise Exception("URL da API não está configurada. Defina 'api_url' em config.")
+        # Retornar lista vazia em vez de lançar exceção
+        return []
     # Constrói endpoint e payload
     url = f"{api_url}/escolas/buscarEscolas"
     payload = json.dumps({"idsme": idcidade, "nomebuscar": nomebuscar}).encode('utf-8')
@@ -98,7 +95,8 @@ def buscar_alunos(nome):
     """
     api_url = get_config_value("api_url", "")
     if not api_url:
-        raise Exception("URL da API não está configurada. Defina 'api_url' em config.")
+        # Retornar lista vazia em vez de lançar exceção
+        return []
     url = f"{api_url}/alunos/buscarAluno"
     # Obtém o id da escola a partir da configuração
     idescola = get_config_value("school_id", "")

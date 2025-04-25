@@ -2,6 +2,8 @@
 import tkinter as tk
 from tkinter import ttk
 from database import get_event_map
+from tkcalendar import DateEntry
+from datetime import date, timedelta
 
 class UserDetailForm(tk.Toplevel):
     def __init__(self, parent, user_info, logs, *args, **kwargs):
@@ -28,14 +30,18 @@ class UserDetailForm(tk.Toplevel):
         for i, (label_text, value) in enumerate(fields):
             ttk.Label(info_frame, text=f"{label_text}:").grid(row=i, column=0, sticky='e', padx=5, pady=2)
             ttk.Label(info_frame, text=value or '').grid(row=i, column=1, sticky='w', padx=5, pady=2)
-        # Filtro de data para logs
+        # Filtro de data com seletor de calendário
         filter_frame = ttk.Frame(main_frame)
         filter_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(filter_frame, text="Data Início (DD/MM/YYYY):").pack(side=tk.LEFT, padx=5)
-        self.start_date_entry = ttk.Entry(filter_frame, width=12)
+        ttk.Label(filter_frame, text="Data Início:").pack(side=tk.LEFT, padx=5)
+        # Inicializa com data 30 dias atrás
+        today = date.today()
+        self.start_date_entry = DateEntry(filter_frame, date_pattern='dd/MM/yyyy', width=12)
+        self.start_date_entry.set_date(today - timedelta(days=30))
         self.start_date_entry.pack(side=tk.LEFT)
-        ttk.Label(filter_frame, text="Data Fim (DD/MM/YYYY):").pack(side=tk.LEFT, padx=5)
-        self.end_date_entry = ttk.Entry(filter_frame, width=12)
+        ttk.Label(filter_frame, text="Data Fim:").pack(side=tk.LEFT, padx=5)
+        self.end_date_entry = DateEntry(filter_frame, date_pattern='dd/MM/yyyy', width=12)
+        self.end_date_entry.set_date(today)
         self.end_date_entry.pack(side=tk.LEFT)
         # Seção de logs
         log_frame = ttk.LabelFrame(main_frame, text="Registros de Acesso", padding="10")
@@ -58,25 +64,12 @@ class UserDetailForm(tk.Toplevel):
                 self.log_tree.delete(item)
             from datetime import datetime
             from tkinter import messagebox
-            # Parse intervalo de datas
-            start_str = self.start_date_entry.get().strip()
-            end_str = self.end_date_entry.get().strip()
-            start_date = None
-            end_date = None
-            if start_str:
-                try:
-                    start_date = datetime.strptime(start_str, "%d/%m/%Y").date()
-                except ValueError:
-                    messagebox.showerror("Erro", "Formato de Data Início inválido. Use DD/MM/YYYY.")
-                    return
-            if end_str:
-                try:
-                    end_date = datetime.strptime(end_str, "%d/%m/%Y").date()
-                except ValueError:
-                    messagebox.showerror("Erro", "Formato de Data Fim inválido. Use DD/MM/YYYY.")
-                    return
+            # Obtém datas do DateEntry
+            start_date = self.start_date_entry.get_date()
+            end_date = self.end_date_entry.get_date()
             event_map = get_event_map()
             # Insere somente logs dentro do intervalo
+            filtered_logs = []
             for log in self.all_logs:
                 ts = log.get('timestamp')
                 try:
@@ -84,18 +77,35 @@ class UserDetailForm(tk.Toplevel):
                 except:
                     continue
                 d = dt.date()
-                if (start_date and d < start_date) or (end_date and d > end_date):
+                # Filtra logs dentro do intervalo de datas
+                if not (start_date <= d <= end_date):
                     continue
-                status = log.get('status')
+                filtered_logs.append({"dt": dt, "status": log.get("status")})
+            # Ordena do mais recente para o mais antigo
+            filtered_logs = sorted(filtered_logs, key=lambda x: x["dt"], reverse=True)
+            for entry in filtered_logs:
+                dt = entry["dt"]
+                status = entry["status"]
                 try:
                     code = int(status)
                 except:
                     code = status
                 name = event_map.get(code, status)
                 self.log_tree.insert("", "end", values=(dt.strftime("%d/%m/%Y"), name))
-        # Botão para aplicar filtro
+        # Botões para filtrar e limpar
         filter_btn = ttk.Button(filter_frame, text="Filtrar", command=apply_filter)
         filter_btn.pack(side=tk.LEFT, padx=5)
+        
+        def clear_filter():
+            # Reset para valores padrão (30 dias atrás até hoje)
+            today = date.today()
+            self.start_date_entry.set_date(today - timedelta(days=30))
+            self.end_date_entry.set_date(today)
+            apply_filter()
+            
+        clear_btn = ttk.Button(filter_frame, text="Limpar Filtro", command=clear_filter)
+        clear_btn.pack(side=tk.LEFT, padx=5)
+        
         # Exibe logs inicialmente
         apply_filter()
         # Botão de fechar
