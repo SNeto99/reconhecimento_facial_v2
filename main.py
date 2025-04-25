@@ -10,6 +10,11 @@ ROOT_DIR = Path(__file__).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
+# Adiciona a biblioteca pyzk ao PYTHONPATH para permitir `import zk`
+pyzk_lib_path = os.path.join(ROOT_DIR, 'sdks_oficiais', 'biblioteca pyzk')
+if pyzk_lib_path not in sys.path:
+    sys.path.insert(0, pyzk_lib_path)
+
 try:
     from ui.main_window import MainWindow
 except ImportError as e:
@@ -21,6 +26,10 @@ except ImportError as e:
 
 def setup_environment():
     """Configura o ambiente necessário para a aplicação"""
+    # Adiciona o diretório da biblioteca pyzk (SDK oficial) ao PYTHONPATH para importar o módulo zk
+    pyzk_lib_path = os.path.join(ROOT_DIR, 'sdks_oficiais', 'biblioteca pyzk')
+    if pyzk_lib_path not in sys.path:
+        sys.path.insert(0, pyzk_lib_path)
     # Adiciona o diretório do SDK ao PATH
     sdk_path = os.path.join(ROOT_DIR, 'sdk')
     if sdk_path not in sys.path:

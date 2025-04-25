@@ -359,6 +359,45 @@ def set_config_value(key, value):
     conn.close()
 
 
+def get_user_info(device_user_id, device_id):
+    """Retorna um dicionário com todos os dados do usuário para o device_id indicado."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT device_user_id, system_id, name, api_name, ra, serie, turma "
+        "FROM usuarios WHERE device_user_id = ? AND device_id = ? AND active = 1",
+        (str(device_user_id), device_id)
+    )
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        return {
+            'user_id': row[0],
+            'system_id': row[1],
+            'name': row[2],
+            'api_name': row[3],
+            'ra': row[4],
+            'serie': row[5],
+            'turma': row[6]
+        }
+    return None
+
+
+def get_logs_by_user(device_user_id, device_id):
+    """Retorna lista de logs (timestamp e status) para o usuário e dispositivo indicados."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT timestamp, status FROM logs "
+        "WHERE user_id = ? AND device_id = ? "
+        "ORDER BY timestamp",
+        (str(device_user_id), device_id)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [{'timestamp': row[0], 'status': row[1]} for row in rows]
+
+
 if __name__ == "__main__":
     init_db()
     print("Banco de dados inicializado com sucesso.") 

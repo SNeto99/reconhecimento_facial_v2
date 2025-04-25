@@ -5,6 +5,7 @@ from .user_form import UserForm
 from core.face_device import FaceDevice
 import time
 from ui.settings_tab import SettingsTab
+from .user_detail import UserDetailForm
 
 class MainWindow(tk.Tk):
     def __init__(self, device=None, *args, **kwargs):
@@ -279,7 +280,10 @@ class MainWindow(tk.Tk):
             column = self.user_list.identify_column(event.x)
             item = self.user_list.identify_row(event.y)
             
-            if column == "#5":  # Coluna Editar
+            if column == "#2":  # Coluna Nome
+                user_id = self.user_list.item(item)['values'][0]
+                self.open_user_detail(user_id)
+            elif column == "#5":  # Coluna Editar
                 user_id = self.user_list.item(item)['values'][0]
                 self.edit_user(user_id)
             elif column == "#6":  # Coluna Apagar
@@ -445,8 +449,10 @@ class MainWindow(tk.Tk):
                     status_code = log['status']
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
                 event_name = event_map.get(status_code, log['status'])
+                # Exibe data/hora no formato DD/MM/YYYY HH:MM:SS
+                ts_display = log['timestamp'].strftime('%d/%m/%Y %H:%M:%S')
                 self.log_list.insert('', 'end', values=(
-                    log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                    ts_display,
                     student_name,
                     event_name
                 ))
@@ -525,10 +531,31 @@ class MainWindow(tk.Tk):
                     status_code = log['status']
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
                 event_name = event_map.get(status_code, log['status'])
+                # Exibe data/hora no formato DD/MM/YYYY HH:MM:SS
+                ts_display = log['timestamp'].strftime('%d/%m/%Y %H:%M:%S')
                 self.log_list.insert('', 'end', values=(
-                    log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                    ts_display,
                     student_name,
                     event_name
                 ))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar logs locais: {str(e)}")
+
+    def open_user_detail(self, user_id):
+        """Abre janela de detalhes do usuário"""
+        if not self.device:
+            messagebox.showerror("Erro", "Por favor, conecte-se ao dispositivo primeiro.")
+            return
+        try:
+            from database import add_device, get_user_info, get_logs_by_user
+            device_info = self.device.get_device_info()
+            current_device_id = add_device(device_info.get("mac"))
+            user_info = get_user_info(user_id, current_device_id)
+            logs = get_logs_by_user(user_id, current_device_id)
+            if not user_info:
+                messagebox.showerror("Erro", "Usuário não encontrado no banco.")
+                return
+            detail = UserDetailForm(self, user_info, logs)
+            self.wait_window(detail)
+        except Exception as e:
+            messagebox.showerror("Erro", f"Não foi possível abrir detalhes: {str(e)}")
