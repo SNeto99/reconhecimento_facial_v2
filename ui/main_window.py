@@ -6,6 +6,7 @@ from core.face_device import FaceDevice
 import time
 from ui.settings_tab import SettingsTab
 from .user_detail import UserDetailForm
+from tkcalendar import DateEntry
 
 class MainWindow(tk.Tk):
     def __init__(self, device=None, *args, **kwargs):
@@ -359,14 +360,14 @@ class MainWindow(tk.Tk):
         self.clear_log_button = ttk.Button(button_frame, text="Limpar Logs", command=self.clear_logs)
         self.clear_log_button.pack(side=tk.LEFT, padx=5)
         
-        # Filtro de data: intervalo inicial e final
+        # Filtro de data com seletor de calendário
         filter_frame = ttk.Frame(frame)
         filter_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(filter_frame, text="Data Início (DD/MM/YYYY):").pack(side=tk.LEFT, padx=5)
-        self.start_date_entry = ttk.Entry(filter_frame, width=12)
+        ttk.Label(filter_frame, text="Data Início:").pack(side=tk.LEFT, padx=5)
+        self.start_date_entry = DateEntry(filter_frame, date_pattern='dd/MM/yyyy', width=12)
         self.start_date_entry.pack(side=tk.LEFT)
-        ttk.Label(filter_frame, text="Data Fim (DD/MM/YYYY):").pack(side=tk.LEFT, padx=5)
-        self.end_date_entry = ttk.Entry(filter_frame, width=12)
+        ttk.Label(filter_frame, text="Data Fim:").pack(side=tk.LEFT, padx=5)
+        self.end_date_entry = DateEntry(filter_frame, date_pattern='dd/MM/yyyy', width=12)
         self.end_date_entry.pack(side=tk.LEFT)
         filter_btn = ttk.Button(filter_frame, text="Filtrar", command=self.refresh_log_list)
         filter_btn.pack(side=tk.LEFT, padx=5)
@@ -458,24 +459,13 @@ class MainWindow(tk.Tk):
                         pass
             logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
             # Filtro de datas
-            start_str = self.start_date_entry.get().strip()
-            end_str = self.end_date_entry.get().strip()
-            start_date = None
-            end_date = None
-            if start_str:
-                try:
-                    start_date = datetime.strptime(start_str, "%d/%m/%Y").date()
-                except ValueError:
-                    messagebox.showerror("Erro", "Formato de Data Início inválido. Use DD/MM/YYYY.")
-                    return
-            if end_str:
-                try:
-                    end_date = datetime.strptime(end_str, "%d/%m/%Y").date()
-                except ValueError:
-                    messagebox.showerror("Erro", "Formato de Data Fim inválido. Use DD/MM/YYYY.")
-                    return
-            # Aplica filtro de intervalo nas datas
-            filtered_logs = [log for log in logs_sorted if not ((start_date and log['timestamp'].date() < start_date) or (end_date and log['timestamp'].date() > end_date))]
+            start_date = self.start_date_entry.get_date()
+            end_date = self.end_date_entry.get_date()
+            if start_date and end_date:
+                # Aplica filtro de intervalo nas datas
+                filtered_logs = [log for log in logs_sorted if not ((start_date <= log['timestamp'].date() <= end_date) or (start_date <= log['timestamp'].date() <= end_date))]
+            else:
+                filtered_logs = logs_sorted
             self.log_count_label.config(text=f"Total de logs: {len(filtered_logs)}")
             for log in filtered_logs:
                 try:
@@ -484,8 +474,16 @@ class MainWindow(tk.Tk):
                     status_code = log['status']
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
                 event_name = event_map.get(status_code, log['status'])
-                # Exibe data/hora no formato DD/MM/YYYY HH:MM:SS
-                ts_display = log['timestamp'].strftime('%d/%m/%Y %H:%M:%S')
+                # Exibe data/hora no formato DD/MM/YYYY HH:MM:SS; trata strings caso não convertidos
+                ts = log['timestamp']
+                if hasattr(ts, 'strftime'):
+                    ts_display = ts.strftime('%d/%m/%Y %H:%M:%S')
+                else:
+                    try:
+                        dt = datetime.strptime(ts, '%Y-%m-%d %H:%M:%S')
+                        ts_display = dt.strftime('%d/%m/%Y %H:%M:%S')
+                    except:
+                        ts_display = ts
                 self.log_list.insert('', 'end', values=(
                     ts_display,
                     student_name,
@@ -560,24 +558,13 @@ class MainWindow(tk.Tk):
                     log['timestamp'] = datetime.strptime(log['timestamp'], "%Y-%m-%d %H:%M:%S")
             logs_sorted = sorted(logs, key=lambda log: log['timestamp'], reverse=True)
             # Filtro de datas
-            start_str = self.start_date_entry.get().strip()
-            end_str = self.end_date_entry.get().strip()
-            start_date = None
-            end_date = None
-            if start_str:
-                try:
-                    start_date = datetime.strptime(start_str, "%d/%m/%Y").date()
-                except ValueError:
-                    messagebox.showerror("Erro", "Formato de Data Início inválido. Use DD/MM/YYYY.")
-                    return
-            if end_str:
-                try:
-                    end_date = datetime.strptime(end_str, "%d/%m/%Y").date()
-                except ValueError:
-                    messagebox.showerror("Erro", "Formato de Data Fim inválido. Use DD/MM/YYYY.")
-                    return
-            # Aplica filtro de intervalo nas datas
-            filtered = [log for log in logs_sorted if not ((start_date and log['timestamp'].date() < start_date) or (end_date and log['timestamp'].date() > end_date))]
+            start_date = self.start_date_entry.get_date()
+            end_date = self.end_date_entry.get_date()
+            if start_date and end_date:
+                # Aplica filtro de intervalo nas datas
+                filtered = [log for log in logs_sorted if not ((start_date <= log['timestamp'].date() <= end_date) or (start_date <= log['timestamp'].date() <= end_date))]
+            else:
+                filtered = logs_sorted
             self.log_count_label.config(text=f"Total de logs: {len(filtered)}")
             for log in filtered:
                 try:
