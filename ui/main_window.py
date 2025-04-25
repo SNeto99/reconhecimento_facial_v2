@@ -12,7 +12,7 @@ class MainWindow(tk.Tk):
         self.title("Interface do Dispositivo ZKTeco")
         
         # Configura o tamanho fixo da janela
-        self.geometry("680x750")
+        self.geometry("950x750")
         
         # Inicializa o dispositivo
         self.device = device
@@ -246,16 +246,19 @@ class MainWindow(tk.Tk):
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
         # Cria a tabela com colunas para botões separados
-        self.user_list = ttk.Treeview(list_frame, columns=("ID", "Nome", "Editar", "Apagar"), show="headings",
-                                     yscrollcommand=scrollbar.set)
+        self.user_list = ttk.Treeview(list_frame, columns=("ID","Nome","RA","Série-Turma","Editar","Apagar"), show="headings", yscrollcommand=scrollbar.set)
         self.user_list.heading("ID", text="ID")
         self.user_list.heading("Nome", text="Nome")
+        self.user_list.heading("RA", text="RA")
+        self.user_list.heading("Série-Turma", text="Série-Turma")
         self.user_list.heading("Editar", text="")
         self.user_list.heading("Apagar", text="")
         
         # Configura larguras das colunas
-        self.user_list.column("ID", width=100)
-        self.user_list.column("Nome", width=200)
+        self.user_list.column("ID", width=60)
+        self.user_list.column("Nome", width=150)
+        self.user_list.column("RA", width=80, anchor="center")
+        self.user_list.column("Série-Turma", width=120, anchor="center")
         self.user_list.column("Editar", width=80, anchor="center")
         self.user_list.column("Apagar", width=80, anchor="center")
         
@@ -276,10 +279,10 @@ class MainWindow(tk.Tk):
             column = self.user_list.identify_column(event.x)
             item = self.user_list.identify_row(event.y)
             
-            if column == "#3":  # Coluna Editar
+            if column == "#5":  # Coluna Editar
                 user_id = self.user_list.item(item)['values'][0]
                 self.edit_user(user_id)
-            elif column == "#4":  # Coluna Apagar
+            elif column == "#6":  # Coluna Apagar
                 user_id = self.user_list.item(item)['values'][0]
                 self.delete_user(user_id)
 
@@ -364,11 +367,14 @@ class MainWindow(tk.Tk):
         scrollbar = ttk.Scrollbar(list_frame)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        self.log_list = ttk.Treeview(list_frame, columns=("Data", "Usuário", "Evento"), show="headings",
-                                     yscrollcommand=scrollbar.set)
+        self.log_list = ttk.Treeview(list_frame, columns=("Data","Usuário","Evento"), show="headings", yscrollcommand=scrollbar.set)
         self.log_list.heading("Data", text="Data/Hora")
         self.log_list.heading("Usuário", text="Usuário")
         self.log_list.heading("Evento", text="Evento")
+        
+        self.log_list.column("Data", width=150)
+        self.log_list.column("Usuário", width=150)
+        self.log_list.column("Evento", width=150)
         
         self.log_list.pack(fill=tk.BOTH, expand=True)
         scrollbar.config(command=self.log_list.yview)
@@ -399,8 +405,11 @@ class MainWindow(tk.Tk):
             for item in self.user_list.get_children():
                 self.user_list.delete(item)
             for u in local_users:
-                # u: [id, device_user_id, system_id, name, synced]
-                self.user_list.insert("", "end", values=(u[1], u[3], "̲E̲d̲i̲t̲a̲r̲", "̲E̲x̲c̲l̲u̲i̲r̲"))
+                ra = u[5] or ""
+                serie_turma = f"{u[6]} - {u[7]}" if (u[6] or u[7]) else ""
+                self.user_list.insert("", "end",
+                    values=(u[1], u[3], ra, serie_turma, "̲E̲d̲i̲t̲a̲r̲", "̲E̲x̲c̲l̲u̲i̲r̲")
+                )
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar lista de usuários: {str(e)}")
             
@@ -434,9 +443,13 @@ class MainWindow(tk.Tk):
                     status_code = int(log['status'])
                 except:
                     status_code = log['status']
-                event_name = event_map.get(status_code, log['status'])
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
-                self.log_list.insert('', 'end', values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'), student_name, event_name))
+                event_name = event_map.get(status_code, log['status'])
+                self.log_list.insert('', 'end', values=(
+                    log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                    student_name,
+                    event_name
+                ))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao atualizar lista de logs: {str(e)}")
         
@@ -445,7 +458,7 @@ class MainWindow(tk.Tk):
         region = self.user_list.identify_region(event.x, event.y)
         column = self.user_list.identify_column(event.x)
         
-        if region == "cell" and column in ("#3", "#4"):  # Colunas de Editar e Apagar
+        if region == "cell" and column in ("#5", "#6"):  # Colunas de Editar e Apagar
             self.user_list.config(cursor="hand2")
         else:
             self.user_list.config(cursor="")
@@ -483,7 +496,11 @@ class MainWindow(tk.Tk):
             for item in self.user_list.get_children():
                 self.user_list.delete(item)
             for u in local_users:
-                self.user_list.insert("", "end", values=(u[1], u[3], "̲E̲d̲i̲t̲a̲r̲", "̲E̲x̲c̲l̲u̲i̲r̲"))
+                ra = u[5] or ""
+                serie_turma = f"{u[6]}-{u[7]}" if (u[6] or u[7]) else ""
+                self.user_list.insert("", "end",
+                    values=(u[1], u[3], ra, serie_turma, "̲E̲d̲i̲t̲a̲r̲", "̲E̲x̲c̲l̲u̲i̲r̲")
+                )
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar usuários locais: {str(e)}")
 
@@ -506,8 +523,12 @@ class MainWindow(tk.Tk):
                     status_code = int(log['status'])
                 except:
                     status_code = log['status']
-                event_name = event_map.get(status_code, log['status'])
                 student_name = user_mapping.get(log['user_id'], log['user_id'])
-                self.log_list.insert('', 'end', values=(log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'), student_name, event_name))
+                event_name = event_map.get(status_code, log['status'])
+                self.log_list.insert('', 'end', values=(
+                    log['timestamp'].strftime('%Y-%m-%d %H:%M:%S'),
+                    student_name,
+                    event_name
+                ))
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar logs locais: {str(e)}")
