@@ -1,7 +1,11 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
-from database import get_config_value, set_config_value
+from tkinter import ttk, messagebox, simpledialog, filedialog
+from database import get_config_value, set_config_value, get_connection
 from core.api import buscar_cidades, buscar_escolas_cidade
+import csv
+import os
+import zipfile
+from datetime import datetime
 
 
 class SettingsTab(ttk.Frame):
@@ -272,8 +276,72 @@ class SettingsTab(ttk.Frame):
         self.after(2000, lambda: self.sync_status.config(text="Status: Conectado"))
 
     def export_data(self):
-        # Placeholder para exportação de dados
-        messagebox.showinfo("Exportar Dados", "Dados exportados com sucesso!")
+        """Exporta todos os dados do banco para arquivos CSV e compacta em um arquivo ZIP."""
+        try:
+            # Solicita ao usuário o local para salvar o arquivo ZIP
+            filename = filedialog.asksaveasfilename(
+                defaultextension=".zip",
+                filetypes=[("Arquivo ZIP", "*.zip")],
+                initialfile=f"exportacao_dados_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+            )
+            
+            if not filename:  # Usuário cancelou a operação
+                return
+                
+            # Cria um diretório temporário para os arquivos CSV
+            temp_dir = os.path.join(os.path.dirname(filename), "temp_export")
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            # Obtém conexão com o banco
+            conn = get_connection()
+            cursor = conn.cursor()
+            
+            # Lista de tabelas para exportar
+            tables = [
+                ("usuarios", "SELECT device_user_id, system_id, name, api_name, ra, serie, turma, active FROM usuarios"),
+                ("dispositivos", "SELECT mac_address, firmware, platform, serial, face_algorithm, device_name, users, faces, records FROM dispositivos"),
+                ("logs", "SELECT timestamp, user_id, status, synced FROM logs"),
+                ("eventos", "SELECT codigo, nome FROM eventos"),
+                ("config", "SELECT key, value FROM config")
+            ]
+            
+            # Exporta cada tabela para um arquivo CSV
+            for table_name, query in tables:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+                
+                if rows:
+                    csv_file = os.path.join(temp_dir, f"{table_name}.csv")
+                    with open(csv_file, 'w', newline='', encoding='utf-8') as f:
+                        writer = csv.writer(f, delimiter=';')
+                        # Escreve o cabeçalho
+                        writer.writerow([description[0] for description in cursor.description])
+                        # Escreve os dados
+                        writer.writerows(rows)
+            
+            conn.close()
+            
+            # Cria o arquivo ZIP com os CSVs
+            with zipfile.ZipFile(filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for file in os.listdir(temp_dir):
+                    if file.endswith('.csv'):
+                        file_path = os.path.join(temp_dir, file)
+                        zipf.write(file_path, file)
+            
+            # Remove o diretório temporário
+            for file in os.listdir(temp_dir):
+                os.remove(os.path.join(temp_dir, file))
+            os.rmdir(temp_dir)
+            
+            messagebox.showinfo("Sucesso", f"Dados exportados com sucesso para:\n{filename}")
+            
+        except Exception as e:
+            messagebox.showerror("Erro", f"Erro ao exportar dados: {str(e)}")
+            # Tenta limpar o diretório temporário em caso de erro
+            if os.path.exists(temp_dir):
+                for file in os.listdir(temp_dir):
+                    os.remove(os.path.join(temp_dir, file))
+                os.rmdir(temp_dir)
 
     def connect_device_from_settings(self):
         ip = self.device_ip_entry.get().strip()

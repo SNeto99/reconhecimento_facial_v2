@@ -35,10 +35,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS usuarios (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             device_user_id TEXT,
-            system_id TEXT,
+            system_id TEXT UNIQUE,
             name TEXT,
             api_name TEXT,
-            ra TEXT,
+            ra TEXT UNIQUE,
             serie TEXT,
             turma TEXT,
             device_id INTEGER,
@@ -92,22 +92,44 @@ def insert_or_update_user(device_user_id, system_id, alias_name, api_name, ra, s
     """
     Insere um novo usuário ou atualiza o existente com referência ao dispositivo.
     Sempre marca o registro como não sincronizado (synced = 0).
+    Aproveita as restrições UNIQUE do banco de dados para evitar duplicações.
     """
     conn = get_connection()
     cursor = conn.cursor()
+    
+    # Primeiro verifica se existe pelo device_user_id e device_id
     cursor.execute("SELECT id FROM usuarios WHERE device_user_id = ? AND device_id = ?", (device_user_id, device_id))
     result = cursor.fetchone()
+    
     if result:
+        # Atualiza o usuário existente
         cursor.execute("""
             UPDATE usuarios
             SET system_id = ?, name = ?, api_name = ?, ra = ?, serie = ?, turma = ?, synced = 0, active = 1
             WHERE device_user_id = ? AND device_id = ?
         """, (system_id, alias_name, api_name, ra, serie, turma, device_user_id, device_id))
     else:
-        cursor.execute("""
-            INSERT INTO usuarios (device_user_id, system_id, name, api_name, ra, serie, turma, device_id, synced, active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
-        """, (device_user_id, system_id, alias_name, api_name, ra, serie, turma, device_id))
+        # Tenta inserir o novo usuário
+        try:
+            cursor.execute("""
+                INSERT INTO usuarios (device_user_id, system_id, name, api_name, ra, serie, turma, device_id, synced, active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)
+            """, (device_user_id, system_id, alias_name, api_name, ra, serie, turma, device_id))
+        except sqlite3.IntegrityError:
+            # Se ocorrer erro de integridade (RA ou system_id duplicado), tenta atualizar o registro existente
+            if ra and ra.strip():
+                cursor.execute("""
+                    UPDATE usuarios
+                    SET device_user_id = ?, name = ?, api_name = ?, serie = ?, turma = ?, device_id = ?, synced = 0, active = 1
+                    WHERE ra = ?
+                """, (device_user_id, alias_name, api_name, serie, turma, device_id, ra))
+            elif system_id and system_id.strip():
+                cursor.execute("""
+                    UPDATE usuarios
+                    SET device_user_id = ?, name = ?, api_name = ?, ra = ?, serie = ?, turma = ?, device_id = ?, synced = 0, active = 1
+                    WHERE system_id = ?
+                """, (device_user_id, alias_name, api_name, ra, serie, turma, device_id, system_id))
+    
     conn.commit()
     conn.close()
 
@@ -209,32 +231,49 @@ def synchronize_logs(device_logs):
 def synchronize_users(device_users, current_device_id):
     """Sincroniza os usuários do dispositivo com os armazenados localmente, considerando o dispositivo.
     Remove os usuários que não estão mais presentes no dispositivo e insere/atualiza os que estão presentes.
+    Aproveita as restrições UNIQUE do banco de dados para evitar duplicações.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, device_user_id, device_id FROM usuarios")
+    
+    # Obter todos os usuários para o dispositivo atual
+    cursor.execute("SELECT id, device_user_id FROM usuarios WHERE device_id = ?", (current_device_id,))
     rows = cursor.fetchall()
-    # Cria um dicionário com chave (device_user_id, device_id)
-    local_users = { (row[1], row[2]): row[0] for row in rows }
-
-    # Usa current_device_id para associar todos os usuários vindos do dispositivo
-    device_keys = set((str(u['user_id']), current_device_id) for u in device_users)
-
+    
+    # Cria um conjunto com os device_user_ids existentes no dispositivo
+    local_user_ids = {row[1] for row in rows}
+    
+    # Cria um conjunto com os device_user_ids vindos do dispositivo
+    device_user_ids = {str(u['user_id']) for u in device_users}
+    
     # Marca como inativo usuários que não estão mais presentes no dispositivo
-    for key, user_id in local_users.items():
-        if key[1] == current_device_id and key not in device_keys:
-            cursor.execute("UPDATE usuarios SET active = 0 WHERE id = ?", (user_id,))
+    for user_id in local_user_ids:
+        if user_id not in device_user_ids:
+            cursor.execute("UPDATE usuarios SET active = 0 WHERE device_user_id = ? AND device_id = ?", 
+                          (user_id, current_device_id))
 
     conn.commit()
     conn.close()
 
     # Insere ou reativa usuários presentes no dispositivo
     for user in device_users:
-        key = (str(user['user_id']), current_device_id)
-        if key not in local_users:
-            # Novo usuário
+        device_user_id = str(user['user_id'])
+        
+        # Verifica se o usuário já existe localmente com o mesmo device_user_id
+        if device_user_id in local_user_ids:
+            # Reativa usuário previamente inativo
+            conn2 = get_connection()
+            cursor2 = conn2.cursor()
+            cursor2.execute(
+                "UPDATE usuarios SET active = 1 WHERE device_user_id = ? AND device_id = ?",
+                (device_user_id, current_device_id)
+            )
+            conn2.commit()
+            conn2.close()
+        else:
+            # Tenta inserir o usuário - a função insert_or_update_user já trata duplicidades por RA ou system_id
             insert_or_update_user(
-                str(user['user_id']),
+                device_user_id,
                 user.get('system_id', ''),
                 user['name'],
                 user.get('api_name', ''),
@@ -243,16 +282,6 @@ def synchronize_users(device_users, current_device_id):
                 user.get('turma', ''),
                 current_device_id
             )
-        else:
-            # Reativa usuário previamente inativo
-            conn2 = get_connection()
-            cursor2 = conn2.cursor()
-            cursor2.execute(
-                "UPDATE usuarios SET active = 1 WHERE device_user_id = ? AND device_id = ?",
-                (str(user['user_id']), current_device_id)
-            )
-            conn2.commit()
-            conn2.close()
 
     return get_all_users()
 
@@ -359,17 +388,45 @@ def set_config_value(key, value):
     conn.close()
 
 
-def get_user_info(device_user_id, device_id):
-    """Retorna um dicionário com todos os dados do usuário para o device_id indicado."""
+def get_user_info(device_user_id, device_id, ra=None, system_id=None):
+    """
+    Retorna um dicionário com todos os dados do usuário para o device_id indicado.
+    Permite buscar o usuário pelo device_user_id, RA ou system_id.
+    """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "SELECT device_user_id, system_id, name, api_name, ra, serie, turma "
-        "FROM usuarios WHERE device_user_id = ? AND device_id = ? AND active = 1",
-        (str(device_user_id), device_id)
-    )
-    row = cursor.fetchone()
+    
+    row = None
+    
+    # Primeiro tenta buscar pelo device_user_id
+    if device_user_id:
+        cursor.execute(
+            "SELECT device_user_id, system_id, name, api_name, ra, serie, turma "
+            "FROM usuarios WHERE device_user_id = ? AND device_id = ? AND active = 1",
+            (str(device_user_id), device_id)
+        )
+        row = cursor.fetchone()
+    
+    # Se não encontrou e temos um RA, busca pelo RA
+    if not row and ra and ra.strip():
+        cursor.execute(
+            "SELECT device_user_id, system_id, name, api_name, ra, serie, turma "
+            "FROM usuarios WHERE ra = ? AND active = 1 LIMIT 1",
+            (ra,)
+        )
+        row = cursor.fetchone()
+    
+    # Se ainda não encontrou e temos um system_id, busca pelo system_id
+    if not row and system_id and system_id.strip():
+        cursor.execute(
+            "SELECT device_user_id, system_id, name, api_name, ra, serie, turma "
+            "FROM usuarios WHERE system_id = ? AND active = 1 LIMIT 1",
+            (system_id,)
+        )
+        row = cursor.fetchone()
+    
     conn.close()
+    
     if row:
         return {
             'user_id': row[0],
