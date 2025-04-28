@@ -7,6 +7,8 @@ import time
 from ui.settings_tab import SettingsTab
 from .user_detail import UserDetailForm
 from tkcalendar import DateEntry
+from database import get_config_value
+from datetime import datetime
 
 class MainWindow(tk.Tk):
     def __init__(self, device=None, *args, **kwargs):
@@ -86,6 +88,9 @@ class MainWindow(tk.Tk):
         # Vincula ao entrar/ sair do canvas de configurações
         settings_canvas.bind("<Enter>", _bind_scroll)
         settings_canvas.bind("<Leave>", _unbind_scroll)
+        
+        # Inicia agendamento de sincronização automática
+        self.start_scheduler()
         
     def create_device_tab(self):
         frame = ttk.Frame(self.device_tab, padding="10")
@@ -614,3 +619,31 @@ class MainWindow(tk.Tk):
         self.end_date_entry.set_date(today)
         # Atualiza sem filtro
         self.refresh_log_list()
+
+    def start_scheduler(self):
+        """Agenda sincronização automática a cada intervalo configurado (minutos)."""
+        intervalo = int(get_config_value("sync_interval", "10"))
+        # Converter para milissegundos
+        self.after(intervalo * 60 * 1000, self.auto_sync)
+
+    def auto_sync(self):
+        """Executa sincronização automática e reagenda."""
+        self.add_log(f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')} - Iniciando sincronização automática...")
+        try:
+            # Usa sync_full para pull do dispositivo e push ao cloud
+            from core.sync import sync_full
+            if not self.device:
+                raise Exception("Dispositivo não conectado")
+            sync_full(self.device)
+            self.add_log(f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')} - Sincronização automática concluída com sucesso.")
+            # Atualiza interface
+            try:
+                self.refresh_device_info()
+                self.refresh_user_list()
+                self.refresh_log_list()
+            except Exception:
+                pass
+        except Exception as e:
+            self.add_log(f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')} - Erro na sincronização automática: {e}")
+        finally:
+            self.start_scheduler()

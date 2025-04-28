@@ -271,9 +271,33 @@ class SettingsTab(ttk.Frame):
         save_button.pack(pady=10)
 
     def sync_with_api(self):
+        """Inicia sincronização completa (pull+push) via API e atualiza o status."""
         self.sync_status.config(text="Status: Sincronizando...")
-        # Placeholder para sincronização com a API
-        self.after(2000, lambda: self.sync_status.config(text="Status: Conectado"))
+        import threading
+        def run_sync():
+            try:
+                # Obtém o dispositivo conectado no toplevel
+                toplevel = self.winfo_toplevel()
+                device = getattr(toplevel, 'device', None)
+                if not device:
+                    raise Exception('Dispositivo não conectado')
+                from core.sync import sync_full
+                sync_full(device)
+                # Função para atualizar status e listas na UI
+                def on_success():
+                    self.sync_status.config(text="Status: Sincronizado com sucesso")
+                    # Atualiza informações do dispositivo e listas na janela principal
+                    if hasattr(toplevel, 'refresh_device_info'):
+                        toplevel.refresh_device_info()
+                    # Atualiza listas na janela principal
+                    if hasattr(toplevel, 'refresh_user_list'):
+                        toplevel.refresh_user_list()
+                    if hasattr(toplevel, 'refresh_log_list'):
+                        toplevel.refresh_log_list()
+                self.after(0, on_success)
+            except Exception as e:
+                self.after(0, lambda ex=e: self.sync_status.config(text=f"Erro: {ex}"))
+        threading.Thread(target=run_sync, daemon=True).start()
 
     def export_data(self):
         """Exporta todos os dados do banco para arquivos CSV e compacta em um arquivo ZIP."""

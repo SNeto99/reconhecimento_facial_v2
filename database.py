@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import datetime
 
 DB_FILENAME = "local_data.db"
 
@@ -26,7 +27,8 @@ def init_db():
             device_name TEXT,
             users INTEGER,
             faces INTEGER,
-            records INTEGER
+            records INTEGER,
+            synced INTEGER DEFAULT 0
         )
     """)
     
@@ -84,6 +86,12 @@ def init_db():
     except sqlite3.OperationalError:
         pass
     
+    # Adiciona coluna 'synced' à tabela de dispositivos, ignorando se já exista
+    try:
+        cursor.execute("ALTER TABLE dispositivos ADD COLUMN synced INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
+    
     conn.commit()
     conn.close()
 
@@ -134,27 +142,30 @@ def insert_or_update_user(device_user_id, system_id, alias_name, api_name, ra, s
     conn.close()
 
 
-def mark_user_as_synced(device_user_id):
-    """Marca o registro de um usuário como sincronizado."""
+def mark_user_as_synced(user_record_id):
+    """Marca o registro de um usuário como sincronizado, usando o ID da linha."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("""
-        UPDATE usuarios
-        SET synced = 1
-        WHERE device_user_id = ?
-    """, (device_user_id,))
+    cursor.execute(
+        "UPDATE usuarios SET synced = 1 WHERE id = ?",
+        (user_record_id,)
+    )
     conn.commit()
     conn.close()
 
 
 def get_unsynced_users():
-    """Retorna a lista de usuários que ainda não foram sincronizados com a API."""
+    """Retorna lista de usuários não sincronizados (synced = 0)."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM usuarios WHERE synced = 0")
+    cursor.execute(
+        "SELECT id, device_user_id, system_id, name, api_name, ra, serie, turma, device_id"
+        " FROM usuarios WHERE synced = 0"
+    )
+    columns = [col[0] for col in cursor.description]
     rows = cursor.fetchall()
     conn.close()
-    return rows
+    return [dict(zip(columns, row)) for row in rows]
 
 
 def get_all_users(active_only=True):
@@ -194,37 +205,49 @@ def get_all_logs():
 
 
 def synchronize_logs(device_logs):
-    """Sincroniza os logs do dispositivo com os logs armazenados localmente, considerando o dispositivo.
-    Mantém apenas os registros que estão presentes tanto no dispositivo quanto no banco de dados.
-    """
+    """Insere apenas logs novos (timestamp maior) do dispositivo, preservando o campo 'synced'."""
     conn = get_connection()
     cursor = conn.cursor()
-
-    # Obter logs locais com id para referência, incluindo device_id
-    cursor.execute("SELECT id, timestamp, user_id, status, device_id, synced FROM logs")
-    rows = cursor.fetchall()
-    # Cria um dicionário com chave (timestamp, user_id, status, device_id) e valor id
-    local_logs = { (row[1], row[2], row[3], row[4]): row[0] for row in rows }
-
-    # Cria um conjunto com as chaves dos logs do dispositivo
-    device_keys = set()
+    # Descobre o último timestamp salvo para este device_id
+    last_ts = None
+    if device_logs:
+        device_id = device_logs[0]['device_id']
+        cursor.execute("SELECT MAX(timestamp) FROM logs WHERE device_id = ?", (device_id,))
+        last_ts = cursor.fetchone()[0]
+    # Converte last_ts para datetime, se existir
+    last_ts_dt = None
+    if isinstance(last_ts, str):
+        try:
+            last_ts_dt = datetime.datetime.strptime(last_ts, "%Y-%m-%d %H:%M:%S")
+        except:
+            last_ts_dt = None
+    # Insere apenas os logs com timestamp > last_ts_dt
     for log in device_logs:
-        key = (log['timestamp'], log['user_id'], log['status'], log['device_id'])
-        device_keys.add(key)
-
-    # Deleta registros locais que não estão presentes no dispositivo
-    for key, log_id in local_logs.items():
-        if key not in device_keys:
-            cursor.execute("DELETE FROM logs WHERE id = ?", (log_id,))
-
-    # Insere registros do dispositivo que não existem no banco
-    for key in device_keys:
-        if key not in local_logs:
-            cursor.execute("INSERT OR IGNORE INTO logs (timestamp, user_id, status, device_id, synced) VALUES (?, ?, ?, ?, 0)", key)
-
+        ts = log.get('timestamp')
+        # Converte ts para datetime
+        ts_dt = None
+        if isinstance(ts, str):
+            try:
+                ts_dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+            except:
+                continue
+        elif isinstance(ts, datetime.datetime):
+            ts_dt = ts
+        else:
+            continue
+        # Verifica se é novo
+        if last_ts_dt is None or ts_dt > last_ts_dt:
+            ts_str = ts_dt.strftime("%Y-%m-%d %H:%M:%S")
+            try:
+                cursor.execute(
+                    "INSERT OR IGNORE INTO logs (timestamp, user_id, status, device_id, synced) VALUES (?, ?, ?, ?, 0)",
+                    (ts_str, log['user_id'], log['status'], log['device_id'])
+                )
+            except Exception as e:
+                print(f"Erro ao sincronizar log: {e}")
     conn.commit()
     conn.close()
-    
+    # Retorna todos os logs para exibição, sem alterar synced
     return get_all_logs()
 
 
@@ -334,7 +357,8 @@ def save_device_info(info):
                 device_name = ?,
                 users = ?,
                 faces = ?,
-                records = ?
+                records = ?,
+                synced = 0
             WHERE mac_address = ?
         """, (
             info.get("firmware"), info.get("platform"), info.get("serial"),
@@ -453,6 +477,50 @@ def get_logs_by_user(device_user_id, device_id):
     rows = cursor.fetchall()
     conn.close()
     return [{'timestamp': row[0], 'status': row[1]} for row in rows]
+
+
+def get_unsynced_devices():
+    """Retorna lista de dispositivos não sincronizados (synced = 0)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, mac_address, firmware, platform, serial, face_algorithm, device_name, users, faces, records FROM dispositivos WHERE synced = 0"
+    )
+    columns = [col[0] for col in cursor.description]
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(zip(columns, row)) for row in rows]
+
+
+def mark_device_as_synced(device_id):
+    """Marca um dispositivo como sincronizado (synced = 1)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE dispositivos SET synced = 1 WHERE id = ?", (device_id,))
+    conn.commit()
+    conn.close()
+
+
+def get_unsynced_logs():
+    """Retorna lista de logs não sincronizados (synced = 0)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, timestamp, user_id, status, device_id FROM logs WHERE synced = 0"
+    )
+    columns = [col[0] for col in cursor.description]
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(zip(columns, row)) for row in rows]
+
+
+def mark_log_as_synced(log_id):
+    """Marca um log como sincronizado (synced = 1)."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("UPDATE logs SET synced = 1 WHERE id = ?", (log_id,))
+    conn.commit()
+    conn.close()
 
 
 if __name__ == "__main__":
