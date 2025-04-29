@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, filedialog
+from tkinter import font as tkfont
 from database import get_config_value, set_config_value, get_connection
 from core.api import buscar_cidades, buscar_escolas_cidade
 import csv
@@ -26,25 +27,48 @@ class SettingsTab(ttk.Frame):
         connect_button.grid(row=0, column=2, padx=5, pady=5)
 
         # Novo frame unificado para Sincronização
-        sync_frame = ttk.LabelFrame(self, text="Sincronização", padding="10")
+        # Padding ajustado para aproximar o conteúdo do título
+        sync_frame = ttk.LabelFrame(self, text="Sincronização", padding=(10,2))
         sync_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Layout simples: sem expansão automática de colunas
 
-        self.sync_status = ttk.Label(sync_frame, text="Status: Desconectado")
-        self.sync_status.grid(row=0, column=0, padx=5, pady=5, sticky='w')
+        # Exibe data/hora da última sincronização ou estado inicial
+        last_sync = get_config_value("last_sync", "")
+        # Prepara prefixo e texto de data separadamente
+        if last_sync:
+            try:
+                dt = datetime.strptime(last_sync, "%Y-%m-%d %H:%M:%S")
+                date_text = dt.strftime('%d/%m/%Y %H:%M:%S')
+            except:
+                date_text = last_sync
+            prefix_text = "Última sincronização:"
+        else:
+            date_text = "Desconectado"
+            prefix_text = "Status:"
+        # Label de prefixo (fonte normal)
+        self.sync_prefix = ttk.Label(sync_frame, text=prefix_text)
+        self.sync_prefix.grid(row=0, column=0, padx=5, pady=(0,2), sticky='w')
+        # Label de data (fonte normal, mesmo estilo do prefixo)
+        self.sync_date = ttk.Label(sync_frame, text=date_text)
+        self.sync_date.grid(row=0, column=1, padx=5, pady=(0,2), sticky='w')
 
         sync_button = ttk.Button(sync_frame, text="Sincronizar com API", command=self.sync_with_api)
-        sync_button.grid(row=0, column=1, padx=5, pady=5)
+        # Botão será reposicionado abaixo após configuração de intervalo
 
-        ttk.Label(sync_frame, text="Intervalo (minutos):").grid(row=1, column=0, padx=5, pady=5, sticky='w')
+        ttk.Label(sync_frame, text="Intervalo (minutos):").grid(row=1, column=0, padx=(5,0), pady=(2,2), sticky='w')
         self.interval_spinbox = ttk.Spinbox(sync_frame, from_=1, to=1440, width=10)
-        self.interval_spinbox.grid(row=1, column=1, padx=5, pady=5, sticky='we')
+        # Spinbox com tamanho fixo, sem expansão
+        self.interval_spinbox.grid(row=1, column=1, padx=(0,5), pady=(2,2))
 
         sync_interval = get_config_value("sync_interval", "10")
         self.interval_spinbox.delete(0, tk.END)
         self.interval_spinbox.insert(0, sync_interval)
 
         save_sync_button = ttk.Button(sync_frame, text="Salvar", command=self.save_sync_config)
-        save_sync_button.grid(row=1, column=2, padx=5, pady=5)
+        save_sync_button.grid(row=1, column=2, padx=5, pady=(2,2))
+        
+        # Posiciona botão de sincronizar abaixo dos minutos, alinhado ao centro
+        sync_button.grid(row=2, column=0, columnspan=3, padx=5, pady=(5,1), sticky='w')
 
         # Container para os formulários de Exportação e Gerenciamento de Eventos
         forms_container = ttk.Frame(self)
@@ -123,7 +147,8 @@ class SettingsTab(ttk.Frame):
         ttk.Label(url_frame, text="Base URL:").grid(row=0, column=0, sticky='w', padx=5, pady=5)
         api_url_entry = ttk.Entry(url_frame, width=40)
         api_url_entry.grid(row=0, column=1, padx=5, pady=5)
-        api_url_entry.insert(0, get_config_value("api_url", ""))
+        api_url_entry.insert(0, get_config_value("api_url", os.getenv("API_URL", ""))
+)
 
         # Credenciais da API
         cred_frame = ttk.LabelFrame(win, text="Credenciais da API", padding="10")
@@ -175,7 +200,9 @@ class SettingsTab(ttk.Frame):
         refresh_cities_btn.grid(row=0, column=2, padx=5, pady=5)
         
         # Tentativa inicial de carregar cidades se houver URL configurada
-        api_url = get_config_value("api_url", "")
+        
+        api_url = get_config_value("api_url", os.getenv("API_URL", ""))
+        
         if api_url:
             try:
                 cidades = buscar_cidades()
@@ -272,7 +299,7 @@ class SettingsTab(ttk.Frame):
 
     def sync_with_api(self):
         """Inicia sincronização completa (pull+push) via API e atualiza o status."""
-        self.sync_status.config(text="Status: Sincronizando...")
+        self.sync_date.config(text=f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')} - Iniciando sincronização...")
         import threading
         def run_sync():
             try:
@@ -285,7 +312,7 @@ class SettingsTab(ttk.Frame):
                 sync_full(device)
                 # Função para atualizar status e listas na UI
                 def on_success():
-                    self.sync_status.config(text="Status: Sincronizado com sucesso")
+                    self.sync_date.config(text=f"Sincronizado com sucesso em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
                     # Atualiza informações do dispositivo e listas na janela principal
                     if hasattr(toplevel, 'refresh_device_info'):
                         toplevel.refresh_device_info()
@@ -294,9 +321,10 @@ class SettingsTab(ttk.Frame):
                         toplevel.refresh_user_list()
                     if hasattr(toplevel, 'refresh_log_list'):
                         toplevel.refresh_log_list()
-                self.after(0, on_success)
+                # Após sucesso, atualiza status com data/hora
+                self.after(0, lambda: self.sync_date.config(text=f"Sincronizado com sucesso em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}") or on_success())
             except Exception as e:
-                self.after(0, lambda ex=e: self.sync_status.config(text=f"Erro: {ex}"))
+                self.after(0, lambda ex=e: self.sync_date.config(text=f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')} - Erro: {ex}"))
         threading.Thread(target=run_sync, daemon=True).start()
 
     def export_data(self):
@@ -322,11 +350,12 @@ class SettingsTab(ttk.Frame):
             
             # Lista de tabelas para exportar
             tables = [
-                ("usuarios", "SELECT device_user_id, system_id, name, api_name, ra, serie, turma, active FROM usuarios"),
-                ("dispositivos", "SELECT mac_address, firmware, platform, serial, face_algorithm, device_name, users, faces, records FROM dispositivos"),
-                ("logs", "SELECT timestamp, user_id, status, synced FROM logs"),
-                ("eventos", "SELECT codigo, nome FROM eventos"),
-                ("config", "SELECT key, value FROM config")
+                ("usuarios", "SELECT * FROM usuarios"),
+                ("dispositivos", "SELECT * FROM dispositivos"),
+                ("registros", "SELECT * FROM logs"),
+                ("eventos", "SELECT * FROM eventos"),
+                ("config", "SELECT * FROM config"),
+                ("api_logs", "SELECT * FROM api_logs")
             ]
             
             # Exporta cada tabela para um arquivo CSV

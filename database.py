@@ -77,6 +77,21 @@ def init_db():
         value TEXT
     )""")
     
+    # Cria a tabela de logs de API para auditoria
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS api_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            method TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            request TEXT,
+            response TEXT,
+            status_code INTEGER,
+            duration_ms INTEGER,
+            error_msg TEXT
+        )
+    """)
+    
     # Insere o evento 15 com o nome padrão 'Validação Facial', se não existir
     cursor.execute("INSERT OR IGNORE INTO eventos (codigo, nome) VALUES (?, ?)", (15, "Validação Facial"))
     
@@ -519,6 +534,32 @@ def mark_log_as_synced(log_id):
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("UPDATE logs SET synced = 1 WHERE id = ?", (log_id,))
+    conn.commit()
+    conn.close()
+
+
+# Função para registrar chamadas à API
+def log_api_call(timestamp, method, endpoint, request, status_code, duration_ms, error_msg=None):
+    """Insere um registro na tabela api_logs."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "INSERT INTO api_logs (timestamp, method, endpoint, request, response, status_code, duration_ms, error_msg) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (timestamp, method, endpoint, request, None, status_code, duration_ms, error_msg)
+    )
+    conn.commit()
+    conn.close()
+
+
+# Função para limpar logs antigos
+def cleanup_api_logs(retention_days):
+    """Remove registros de api_logs com mais de retention_days de idade."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM api_logs WHERE timestamp < datetime('now', ?)",
+        (f'-{retention_days} days',)
+    )
     conn.commit()
     conn.close()
 

@@ -28,7 +28,8 @@ class FaceDevice:
         """Inicializa as DLLs do SDK"""
         try:
             self._log("Inicializando conexão de rede...")
-            self.zk = ZK(self.ip, port=self.port, timeout=10)
+            # Instancia o SDK usando Latin-1 para suportar acentuação no dispositivo
+            self.zk = ZK(self.ip, port=self.port, timeout=10, encoding='latin1')
             
             # Removemos a parte de inicialização do SDK USB já que vamos usar rede
             self._log("Inicialização concluída")

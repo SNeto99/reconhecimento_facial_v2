@@ -1,34 +1,84 @@
 # -*- coding: utf-8 -*-
 import json
-import random
+import os
+import time
 import urllib.request
 import urllib.error
-from database import get_config_value
+from dotenv import load_dotenv
+from database import get_config_value, log_api_call, cleanup_api_logs, set_config_value
+from datetime import datetime
+from io import BytesIO
 
+# Carrega variáveis de ambiente
+load_dotenv()
 
 def _api_request(path, payload=None):
     """
     Realiza requisição HTTP (GET se payload=None, POST se payload!=None) com headers padrão.
+    Inclui logging e limpeza de registros antigos.
     """
-    api_url = get_config_value("api_url", "")
+    api_url = get_config_value("api_url", os.getenv("API_URL", ""))
     if not api_url:
         raise Exception("URL da API não configurada")
     url = f"{api_url}/{path}"
+    # Cleanup logs antigos uma vez por dia
+    try:
+        retention_days = int(os.getenv("API_LOG_RETENTION_DAYS", "365"))
+        last_cleanup = get_config_value("last_api_log_cleanup", "")
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        if last_cleanup != today_str:
+            cleanup_api_logs(retention_days)
+            set_config_value("last_api_log_cleanup", today_str)
+    except Exception:
+        pass
+
     school_id = get_config_value("school_id", "")
     mac_address = get_config_value("device_mac", "")
     headers = {"X-School-Id": school_id, "X-MAC-Address": mac_address}
     if payload is not None:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=payload, headers=headers)
+    # Logging start
+    start_ts = time.perf_counter()
+    method = 'POST' if payload is not None else 'GET'
+    # Trunca request para tamanho máximo
+    max_req = int(os.getenv("API_LOG_MAX_REQUEST_SIZE", "10000"))
+    req_str = payload.decode('utf-8', errors='ignore')[:max_req] if payload else ''
     try:
-        resp = urllib.request.urlopen(req)
-        code = resp.getcode()
-        if code not in (200, 201):
-            raise Exception(f"Erro ao acessar {path}: HTTP {code}")
-        return resp
+        resp_orig = urllib.request.urlopen(req)
+        status_code = resp_orig.getcode()
+        # Lê e trunca response
+        raw_bytes = resp_orig.read()
+        max_res = int(os.getenv("API_LOG_MAX_RESPONSE_SIZE", "20000"))
+        resp_str = raw_bytes.decode('utf-8', errors='ignore')[:max_res]
+        # Calcula duração
+        end_ts = time.perf_counter()
+        duration_ms = int((end_ts - start_ts) * 1000)
+        # Log no DB
+        log_api_call(
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            method, path, req_str, status_code, duration_ms, None
+        )
+        # Reconstrói resposta para o chamador
+        new_resp = BytesIO(raw_bytes)
+        new_resp.getcode = lambda: status_code
+        return new_resp
     except urllib.error.HTTPError as e:
+        # Calcula duração em falha
+        end_ts = time.perf_counter()
+        duration_ms = int((end_ts - start_ts) * 1000)
+        log_api_call(
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            method, path, req_str, e.code, duration_ms, str(e)
+        )
         raise Exception(f"Erro HTTP ao acessar {path}: {e.code} - {e.reason}")
     except urllib.error.URLError as e:
+        end_ts = time.perf_counter()
+        duration_ms = int((end_ts - start_ts) * 1000)
+        log_api_call(
+            datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            method, path, req_str, None, duration_ms, str(e)
+        )
         raise Exception(f"Erro de rede ao acessar {path}: {e.reason}")
 
 def buscar_cidades():

@@ -4,6 +4,7 @@ from database import (
     get_unsynced_logs, mark_log_as_synced
 )
 from core.api import enviar_dispositivos_batch, enviar_usuarios_batch, enviar_logs_batch
+from datetime import datetime
 
 
 def sync_all():
@@ -44,11 +45,13 @@ def sync_full(device):
     """
     Atualiza localmente dados do dispositivo (info, usuários, logs) e depois envia tudo ao cloud.
     """
-    from database import init_db, add_device, save_device_info, synchronize_users, synchronize_logs
+    from database import init_db, add_device, save_device_info, synchronize_users, synchronize_logs, set_config_value
     # 1) Garante tabelas e colunas
     init_db()
     # 2) Dispositivo: info e reset synced
     info = device.get_device_info()
+    # Armazena o MAC do dispositivo em config para envio nos headers da API
+    set_config_value("device_mac", info.get("mac"))
     current_device_id = add_device(info.get('mac'))
     save_device_info(info)
     # 3) Usuários do dispositivo para o DB
@@ -62,4 +65,11 @@ def sync_full(device):
     synchronize_logs(device_logs)
     # 5) Envia ao cloud em batches
     sync_all()
+    # 6) Grava data/hora da última sincronização
+    try:
+        from database import set_config_value
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        set_config_value('last_sync', now_str)
+    except Exception:
+        pass
     

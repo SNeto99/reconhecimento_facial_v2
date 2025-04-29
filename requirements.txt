@@ -2,3 +2,4 @@ pyzkaccess
 pillow 
 requests 
 tkcalendar 
+python-dotenv>=0.21.0 

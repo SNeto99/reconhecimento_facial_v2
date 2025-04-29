@@ -1,0 +1,56 @@
+[
+    {
+        "dispositivo": {
+            "id": 1,
+            "mac_address": "00:17:61:12:c4:be",
+            "firmware": "Ver 6.60 Aug 19 2021",
+            "platform": "ZAM180_TFT", 
+            "serial": "CP9L231460926",
+            "face_algorithm": "39",
+            "device_name": "SpeedFace-V4L",
+            "users": 9,
+            "faces": 5,
+            "records": 52
+        }
+    },
+    {
+        "registros": [
+            {
+                "id": 3600,
+                "timestamp": "2025-04-28 15:24:29",
+                "user_id": "1",
+                "status": "15", 
+                "device_id": 1
+            },
+            {
+                "id": 3601,
+                "timestamp": "2025-04-28 16:17:22",
+                "user_id": "4",
+                "status": "15",
+                "device_id": 1
+            },
+            {
+                "id": 3602,
+                "timestamp": "2025-04-28 16:46:49",
+                "user_id": "2",
+                "status": "15",
+                "device_id": 1
+            }
+        ]
+    },
+    {
+        "usuarios": [
+            {
+                "id": 16,
+                "device_user_id": "7",
+                "system_id": "",
+                "name": "JADER AFFONSO CRUZ MIQUE",
+                "api_name": "",
+                "ra": "",
+                "serie": "",
+                "turma": "",
+                "device_id": 1
+            }
+        ]
+    }
+]

@@ -6,8 +6,9 @@ from zk import const
 import base64
 import json
 import time
-from core.api import buscar_alunos
+from core.api import buscar_alunos, buscar_cidades, buscar_escolas_cidade
 from database import add_device, insert_or_update_user
+import unicodedata
 
 class UserForm(tk.Toplevel):
     def __init__(self, parent, device, user=None, *args, **kwargs):
@@ -226,7 +227,12 @@ class UserForm(tk.Toplevel):
 
     def search_api(self):
         """Busca alunos na API e popula a listbox"""
-        nome = self.api_search_entry.get().strip()
+        # Obtém o texto e remove acentos para busca na API
+        raw_nome = self.api_search_entry.get().strip()
+        nome = ''.join(
+            c for c in unicodedata.normalize('NFKD', raw_nome)
+            if not unicodedata.combining(c)
+        )
         try:
             results = buscar_alunos(nome)
             self.api_results = results
