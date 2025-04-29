@@ -124,11 +124,12 @@ class MainWindow(tk.Tk):
         # Status de conexão do dispositivo com ícone colorido
         status_text = "Conectado" if self.device else "Desconectado"
         icon_color = "green" if self.device else "red"
-        # Status do dispositivo com ícone e texto
-        status_label = ttk.Label(stats_frame, text=f"Status do dispositivo: {status_text}")
-        status_label.grid(row=0, column=0, sticky="w", padx=(5,0), pady=2)
-        icon_label = tk.Label(stats_frame, text="●", fg=icon_color)
-        icon_label.grid(row=0, column=1, padx=(0,5), pady=2)
+        # Status do dispositivo com ícone e texto colados
+        status_container = ttk.Frame(stats_frame)
+        status_container.grid(row=0, column=0, sticky="w", padx=(5,0), pady=2, columnspan=2)
+        ttk.Label(status_container, text="Status do dispositivo:").pack(side="left")
+        tk.Label(status_container, text="●", fg=icon_color).pack(side="left", padx=(2,0))
+        ttk.Label(status_container, text=status_text).pack(side="left", padx=(2,0))
         # Reordenação dos indicadores
         # 1: Última sincronização
         ttk.Label(stats_frame, text=f"Última sincronização: {last_sync}").grid(row=1, column=0, sticky="w", padx=5, pady=2)
