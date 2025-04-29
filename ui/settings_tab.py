@@ -30,6 +30,8 @@ class SettingsTab(ttk.Frame):
         # Padding ajustado para aproximar o conteúdo do título
         sync_frame = ttk.LabelFrame(self, text="Sincronização", padding=(10,2))
         sync_frame.pack(fill=tk.X, padx=10, pady=5)
+        # Permite que a coluna 1 expanda, mantendo botão Salvar fixo à direita
+        sync_frame.columnconfigure(1, weight=1)
         # Layout simples: sem expansão automática de colunas
 
         # Exibe data/hora da última sincronização ou estado inicial
@@ -57,15 +59,16 @@ class SettingsTab(ttk.Frame):
 
         ttk.Label(sync_frame, text="Intervalo (minutos):").grid(row=1, column=0, padx=(5,0), pady=(2,2), sticky='w')
         self.interval_spinbox = ttk.Spinbox(sync_frame, from_=1, to=1440, width=10)
-        # Spinbox com tamanho fixo, sem expansão
-        self.interval_spinbox.grid(row=1, column=1, padx=(0,5), pady=(2,2))
+        # Spinbox fixo à esquerda da coluna expansível
+        self.interval_spinbox.grid(row=1, column=1, padx=(0,5), pady=(2,2), sticky='w')
 
         sync_interval = get_config_value("sync_interval", "10")
         self.interval_spinbox.delete(0, tk.END)
         self.interval_spinbox.insert(0, sync_interval)
 
         save_sync_button = ttk.Button(sync_frame, text="Salvar", command=self.save_sync_config)
-        save_sync_button.grid(row=1, column=2, padx=5, pady=(2,2))
+        # Botão Salvar alinhado à direita da coluna 2
+        save_sync_button.grid(row=1, column=2, padx=5, pady=(2,2), sticky='e')
         
         # Posiciona botão de sincronizar abaixo dos minutos, alinhado ao centro
         sync_button.grid(row=2, column=0, columnspan=3, padx=5, pady=(5,1), sticky='w')

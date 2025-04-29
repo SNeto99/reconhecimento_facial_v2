@@ -16,7 +16,7 @@ class MainWindow(tk.Tk):
         self.title("Interface do Dispositivo ZKTeco")
         
         # Configura o tamanho fixo da janela
-        self.geometry("950x750")
+        self.geometry("1200x800")
         
         # Inicializa o dispositivo
         self.device = device
@@ -96,37 +96,127 @@ class MainWindow(tk.Tk):
         frame = ttk.Frame(self.device_tab, padding="10")
         frame.pack(fill=tk.BOTH, expand=True)
         
-        # Frame para informações do dispositivo
-        info_label = ttk.Label(frame, text="Informações do Dispositivo", font=('Helvetica', 12, 'bold'))
-        info_label.pack(pady=10)
+        # Nome da escola em negrito no topo da página
+        escola = get_config_value("school_name", "---")
+        escola_label = ttk.Label(frame, text=escola, font=('Helvetica', 12, 'bold'))
+        escola_label.pack(pady=(0,10))
         
-        # Criando frame para informações em grid
-        info_frame = ttk.Frame(frame)
-        info_frame.pack(fill=tk.BOTH, expand=True, padx=20)
+        # Estatísticas Gerais para o administrador
+        stats_frame = ttk.LabelFrame(frame, text="Estatísticas Gerais", padding="10")
+        stats_frame.pack(fill=tk.X, padx=20, pady=(0,10))
+        # Carrega dados de usuários e logs
+        from database import get_connection, get_unsynced_logs
+        conn_stats = get_connection()
+        cur_stats = conn_stats.cursor()
+        cur_stats.execute("SELECT COUNT(*) FROM usuarios")
+        total_users = cur_stats.fetchone()[0]
+        cur_stats.execute("SELECT COUNT(*) FROM logs")
+        total_logs = cur_stats.fetchone()[0]
+        conn_stats.close()
+        unsynced = len(get_unsynced_logs())
+        # Data da última sincronização (formatar para d/m/Y)
+        last_sync_raw = get_config_value("last_sync", "Nunca")
+        try:
+            last_sync = datetime.strptime(last_sync_raw, "%Y-%m-%d %H:%M:%S").strftime('%d/%m/%Y %H:%M:%S')
+        except:
+            last_sync = last_sync_raw
+        sync_interval = get_config_value("sync_interval", "Não definido")
+        # Status de conexão do dispositivo com ícone colorido
+        status_text = "Conectado" if self.device else "Desconectado"
+        icon_color = "green" if self.device else "red"
+        # Status do dispositivo com ícone e texto
+        status_label = ttk.Label(stats_frame, text=f"Status do dispositivo: {status_text}")
+        status_label.grid(row=0, column=0, sticky="w", padx=(5,0), pady=2)
+        icon_label = tk.Label(stats_frame, text="●", fg=icon_color)
+        icon_label.grid(row=0, column=1, padx=(0,5), pady=2)
+        # Reordenação dos indicadores
+        # 1: Última sincronização
+        ttk.Label(stats_frame, text=f"Última sincronização: {last_sync}").grid(row=1, column=0, sticky="w", padx=5, pady=2)
+        # 2: Intervalo entre sincronizações
+        ttk.Label(stats_frame, text=f"Intervalo entre sincronizações: {sync_interval} minutos").grid(row=2, column=0, sticky="w", padx=5, pady=2)
+        # 3: Espaço em branco (pula linha)
+        ttk.Label(stats_frame, text="").grid(row=3, column=0, pady=2)
+        # 4: Total de usuários
+        ttk.Label(stats_frame, text=f"Total de usuários: {total_users}").grid(row=4, column=0, sticky="w", padx=5, pady=2)
+        # 5: Total de Registros
+        ttk.Label(stats_frame, text=f"Total de Registros: {total_logs}").grid(row=5, column=0, sticky="w", padx=5, pady=2)
+        # 6: Registros não sincronizados
+        ttk.Label(stats_frame, text=f"Registros não sincronizados: {unsynced}").grid(row=6, column=0, sticky="w", padx=5, pady=2)
+        # 7: Registros hoje
+        conn_today = get_connection()
+        cur_today = conn_today.cursor()
+        cur_today.execute("SELECT COUNT(*) FROM logs WHERE date(timestamp)=date('now','localtime')")
+        today_count = cur_today.fetchone()[0]
+        conn_today.close()
+        ttk.Label(stats_frame, text=f"Registros hoje: {today_count}").grid(row=7, column=0, sticky="w", padx=5, pady=2)
+        # Últimos 10 registros de acesso (JOIN para trazer nome e evento)
+        last_frame = ttk.LabelFrame(frame, text="Últimos Registros", padding="10")
+        last_frame.pack(fill=tk.X, padx=20, pady=(0,10))
+        from database import get_connection
+        conn_last = get_connection()
+        cur_last = conn_last.cursor()
+        cur_last.execute(
+            """SELECT l.timestamp,
+                              COALESCE(u.name, l.user_id) AS user_name,
+                              u.ra AS ra,
+                              u.serie AS serie,
+                              u.turma AS turma,
+                              COALESCE(e.nome, l.status) AS event_name
+               FROM logs l
+               LEFT JOIN usuarios u ON u.device_user_id = l.user_id
+               LEFT JOIN eventos e ON e.codigo = l.status
+               ORDER BY l.timestamp DESC
+               LIMIT 5"""
+        )
+        rows_last = cur_last.fetchall()
+        conn_last.close()
+        # Cria Treeview para mostrar registros (inclui RA e Série-Turma)
+        cols = ("Data", "Usuário", "RA", "Série-Turma", "Evento")
+        tree = ttk.Treeview(last_frame, columns=cols, show="headings", height=5)
+        for col in cols:
+            tree.heading(col, text=col)
+            # Centraliza RA, Série-Turma e Evento; restante alinhado à esquerda
+            if col in ("RA", "Série-Turma", "Evento"):
+                tree.column(col, anchor="center", stretch=True)
+            else:
+                tree.column(col, anchor="w", stretch=True)
+        tree.pack(fill=tk.BOTH, expand=True)
+        # Popula os registros
+        for ts, user_name, ra, serie, turma, event_name in rows_last:
+            try:
+                from datetime import datetime
+                dt = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+                ts_disp = dt.strftime("%d/%m/%Y %H:%M:%S")
+            except:
+                ts_disp = ts
+            # Combina série e turma
+            serie_turma = f"{serie}-{turma}" if serie or turma else ""
+            tree.insert("", "end", values=(ts_disp, user_name, ra, serie_turma, event_name))
         
-        # Labels para as informações
-        self.info_labels = {}
-        info_fields = [
-            ("MAC", "Endereço MAC:"),
-            ("firmware", "Versão do Firmware:"),
-            ("platform", "Plataforma:"),
-            ("serial", "Número de Série:"),
-            ("face_algorithm", "Algoritmo Facial:"),
-            ("users", "Total de Usuários:"),
-            ("faces", "Total de Faces:"),
-            ("records", "Total de Registros:"),
-            ("device_name", "Nome do Dispositivo:")
-        ]
-        
-        for i, (key, text) in enumerate(info_fields):
-            ttk.Label(info_frame, text=text).grid(row=i, column=0, sticky='e', padx=5, pady=3)
-            value_label = ttk.Label(info_frame, text="---")
-            value_label.grid(row=i, column=1, sticky='w', padx=5, pady=3)
-            self.info_labels[key] = value_label
-        
-        # Botão para atualizar informações
-        refresh_button = ttk.Button(frame, text="Atualizar Informações", command=self.refresh_device_info)
-        refresh_button.pack(pady=10)
+        # Botão para atualizar toda a página ao final da aba
+        def _refresh_page():
+            # Sincroniza logs do dispositivo para o banco antes de atualizar a view
+            if self.device:
+                from database import add_device, synchronize_logs
+                device_info = self.device.get_device_info()
+                device_id = add_device(device_info.get('mac'))
+                logs = self.device.get_attendance_logs()
+                for log in logs:
+                    log['device_id'] = device_id
+                synchronize_logs(logs)
+            # Limpa todo o conteúdo da aba Dispositivo
+            for w in self.device_tab.winfo_children():
+                w.destroy()
+            # Reconstrói a aba completamente
+            self.create_device_tab()
+            # Recarrega as abas de Usuários e Logs
+            try:
+                self.refresh_user_list()
+                self.refresh_log_list()
+            except:
+                pass
+        refresh_page_btn = ttk.Button(frame, text="Atualizar", command=_refresh_page)
+        refresh_page_btn.pack(pady=(10,10))
         
     def add_log(self, message):
         """Adiciona uma mensagem à área de log"""
@@ -213,15 +303,6 @@ class MainWindow(tk.Tk):
             
             # Atualiza os labels com as informações
             if info:
-                self.info_labels["MAC"].config(text=info.get("mac", "---"))
-                self.info_labels["firmware"].config(text=info.get("firmware", "---"))
-                self.info_labels["platform"].config(text=info.get("platform", "---"))
-                self.info_labels["serial"].config(text=info.get("serial", "---"))
-                self.info_labels["face_algorithm"].config(text=info.get("face_algorithm", "---"))
-                self.info_labels["users"].config(text=str(info.get("users", "---")))
-                self.info_labels["faces"].config(text=str(info.get("faces", "---")))
-                self.info_labels["records"].config(text=str(info.get("records", "---")))
-                self.info_labels["device_name"].config(text=info.get("device_name", "---"))
                 from database import save_device_info
                 device_id = save_device_info(info)
                 self.add_log(f"Dispositivo salvo com id: {device_id}")
