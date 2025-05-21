@@ -1,0 +1,6 @@
+@echo off
+echo Iniciando processo de registro facial...
+python registrar_face.py
+echo.
+echo Pressione qualquer tecla para sair...
+pause > nul 
